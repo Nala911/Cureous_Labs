@@ -50,8 +50,8 @@ scripts/
 ├── 05_devices/
 ├── 06_rental_agreements/
 ├── 07_stock_transfers/
-├── 08_bed_station/
-├── 09_bed_station_log/
+├── 08_bed_stations/
+├── 09_bed_station_logs/
 ├── 10_rental_log/
 ├── 11_qc_sanitization/
 ├── wizards/

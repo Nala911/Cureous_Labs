@@ -25,7 +25,6 @@ Cureous_Labs/
 │   ├── 11_qc_sanitization/
 │   ├── wizards/
 │   └── functions/
-├── archive/                     # Historical backup files
 ├── GEMINI.md                    # Core architectural protocol and development rules
 ├── .gitignore
 └── README.md
