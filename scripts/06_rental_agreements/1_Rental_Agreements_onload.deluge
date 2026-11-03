@@ -1,0 +1,78 @@
+/* ==============================================================================
+   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge
+   Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Title, Agreement_Start_Date, Billing_Unit, Active_Deployed_Stations, Agreement_Status, Agreement_End_Date, Security_Deposit, Rental_Agreement_ID]
+   Cross-Forms  : None
+   Purpose      : Intelligent Form UX: In Add mode, user entry fields are Customer,
+                  Rental Item, Agreed Rate, Agreement Title (editable), and Agreement
+                  Start Date (editable, defaulted to today). Billing Unit is disabled
+                  only to provide context. Irrelevant fields (Active Deployed Stations,
+                  Agreement Status, Agreement End Date, Security Deposit, Agreement ID)
+                  are completely hidden during new agreement creation. In Edit mode,
+                  locks contract identity while allowing rate, title, and lifecycle updates.
+   Optimization : Zero database queries consumed.
+============================================================================== */
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: User interactive inputs (Enabled & Visible)
+    enable Customer;
+    show Customer;
+    
+    enable Rental_Item;
+    show Rental_Item;
+    
+    enable Agreed_Rate;
+    show Agreed_Rate;
+    
+    // Agreement Title is auto-filled on selecting Customer & Rental Item, but user is allowed to edit it
+    enable Agreement_Title;
+    show Agreement_Title;
+    
+    // Agreement Start Date is auto-filled to today's date, but user is allowed to edit it
+    input.Agreement_Start_Date = zoho.currentdate;
+    enable Agreement_Start_Date;
+    show Agreement_Start_Date;
+    
+    // 2. Context Field: Disabled only (auto-filled from Product Catalog, gives context to user)
+    disable Billing_Unit;
+    show Billing_Unit;
+    
+    // 3. Hidden Fields: Irrelevant on initial creation (for reports and lifecycle tracking only)
+    hide Active_Deployed_Stations;
+    hide Agreement_Status;
+    hide Agreement_End_Date;
+    hide Security_Deposit;
+    hide Rental_Agreement_ID;
+    
+    // Background defaults
+    input.Agreement_Status = "Active";
+    input.Active_Deployed_Stations = 0;
+    input.Agreement_End_Date = null;
+}
+else
+{
+    // 4. EDIT Mode: Contract identity is immutable
+    disable Customer;
+    disable Rental_Item;
+    disable Rental_Agreement_ID;
+    disable Billing_Unit;
+    
+    // Commercial, operational, and lifecycle parameters can be adjusted
+    enable Agreed_Rate;
+    enable Agreement_Title;
+    enable Agreement_Start_Date;
+    enable Agreement_Status;
+    enable Agreement_End_Date;
+    enable Security_Deposit;
+    
+    // Display all fields in edit mode
+    show Active_Deployed_Stations;
+    show Agreement_Status;
+    show Agreement_End_Date;
+    show Rental_Agreement_ID;
+    show Security_Deposit;
+    show Billing_Unit;
+}

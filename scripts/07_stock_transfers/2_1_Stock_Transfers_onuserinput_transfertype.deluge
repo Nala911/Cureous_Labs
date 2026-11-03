@@ -1,0 +1,104 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On User Input)
+   Trigger Hook : Form Actions -> On User Input -> Field: Transfer_Type
+   File Path    : scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge
+   Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number]
+   Cross-Forms  : [Locations]
+   Purpose      : Dynamically adjusts directional field visibility and resets choices
+                  based on the selected Transfer Type (Inter Branch, Office to Customer,
+                  Customer to Office). Keeps hardware selection hidden until Source is selected.
+   Optimization : Zero database queries consumed unless Inter Branch requires locations.
+============================================================================== */
+
+// 1. Reset all dependent selections and counters whenever Transfer Type changes
+input.Select_Control_Unit = null;
+input.Select_Overlay = null;
+input.Control_Unit_Number = 0;
+input.Overlay_Number = 0;
+
+input.Select_Control_Unit:ui.add(List());
+input.Select_Overlay:ui.add(List());
+
+// Hide hardware selection fields until Source is explicitly selected
+hide Select_Control_Unit;
+hide Select_Overlay;
+disable Select_Control_Unit;
+disable Select_Overlay;
+
+// 2. Dynamic Directional Field Routing based on Transfer Type
+if(input.Transfer_Type == "Inter Branch")
+{
+    // Warehouse to Warehouse movement
+    show Source_Office;
+    enable Source_Office;
+    
+    show Destination_Office;
+    enable Destination_Office;
+    
+    // Ensure Destination choices are reset
+    if(input.Source_Office != null)
+    {
+        input.Destination_Office:ui.add(Locations[ID != input.Source_Office].ID.getAll());
+    }
+    else
+    {
+        input.Destination_Office:ui.add(Locations[ID != null].ID.getAll());
+    }
+    
+    hide Source_Customer;
+    disable Source_Customer;
+    input.Source_Customer = null;
+    
+    hide Destination_Customer;
+    disable Destination_Customer;
+    input.Destination_Customer = null;
+}
+else if(input.Transfer_Type == "Office to Customer")
+{
+    // Dispatch to Customer for Rental, Demo, or Trial
+    show Source_Office;
+    enable Source_Office;
+    
+    show Destination_Customer;
+    enable Destination_Customer;
+    
+    hide Source_Customer;
+    disable Source_Customer;
+    input.Source_Customer = null;
+    
+    hide Destination_Office;
+    disable Destination_Office;
+    input.Destination_Office = null;
+}
+else if(input.Transfer_Type == "Customer to Office")
+{
+    // Retrieval / Return from Customer to Warehouse
+    show Source_Customer;
+    enable Source_Customer;
+    
+    show Destination_Office;
+    enable Destination_Office;
+    input.Destination_Office:ui.add(Locations[ID != null].ID.getAll());
+    
+    hide Source_Office;
+    disable Source_Office;
+    input.Source_Office = null;
+    
+    hide Destination_Customer;
+    disable Destination_Customer;
+    input.Destination_Customer = null;
+}
+else
+{
+    // Fallback if Transfer Type is cleared
+    hide Source_Office;
+    hide Source_Customer;
+    hide Destination_Office;
+    hide Destination_Customer;
+    
+    disable Source_Office;
+    disable Source_Customer;
+    disable Destination_Office;
+    disable Destination_Customer;
+}

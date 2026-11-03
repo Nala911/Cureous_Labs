@@ -1,0 +1,12 @@
+/* ==============================================================================
+   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created -> Form Actions -> On Success
+   File Path    : scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge
+   Purpose      : Navigates cleanly to the 'All_Rental_Agreements' report upon successful
+                  save, terminating the submit loading spinner immediately.
+   Optimization : 0 database queries consumed.
+============================================================================== */
+
+// Redirect cleanly to the All_Rental_Agreements report (instantly dismisses submit loader)
+openUrl("#Report:All_Rental_Agreements", "same window");

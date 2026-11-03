@@ -1,0 +1,42 @@
+/* ==============================================================================
+   Module Name  : Customers (Form Link Name: Customers)
+   Script Type  : Form Workflow (On Validate)
+   Trigger Hook : Created or Edited -> Form Actions -> On Validate
+   File Path    : scripts/02_customers/3_Customers_onvalidate.deluge
+   Purpose      : Enforces mandatory customer selection and Books profile linkage,
+                   executes duplicate guard with friendly user guidance, and
+                   guarantees default status and rollup counter initialization.
+   Optimization : Max 1 indexed query for duplicate check. Runs in <10ms.
+============================================================================== */
+
+// 1. Mandatory Field Checks
+if(input.Customer_Name == null || input.Customer_Name.trim() == "")
+{
+    alert "Customer Name is mandatory. Please select an active customer from the dropdown.";
+    cancel submit;
+}
+
+if(input.Customer_ID == null || input.Customer_ID.trim() == "")
+{
+    alert "Customer Profile Missing: Unable to retrieve Zoho Books Contact ID.\n\nPlease re-select the customer from the dropdown to fetch their profile details from Zoho Books.";
+    cancel submit;
+}
+
+// 2. Friendly Duplicate Guard (Corrected Operator Precedence for Add & Edit)
+existing_customers = Customers[(Customer_ID == input.Customer_ID || Customer_Name == input.Customer_Name) && ID != input.ID];
+if(existing_customers.count() > 0)
+{
+    alert "Customer Already Onboarded:\n\n'" + input.Customer_Name + "' is already registered in Cureous PRS with Customer ID " + input.Customer_ID + ".\n\nDuplicate onboarding is prevented. You can view or use this customer from the 'All Customers' report.";
+    cancel submit;
+}
+
+// 3. Safety Defaults for Status and Rollup Counters
+if(input.Customer_Status == null || input.Customer_Status == "")
+{
+    input.Customer_Status = "Active";
+}
+
+if(input.Active_Control_Unit_Count == null) { input.Active_Control_Unit_Count = 0; }
+if(input.Active_Overlay_Count == null) { input.Active_Overlay_Count = 0; }
+if(input.Active_Bed_Stations_Count == null) { input.Active_Bed_Stations_Count = 0; }
+if(input.Spare_Units_Count == null) { input.Spare_Units_Count = 0; }

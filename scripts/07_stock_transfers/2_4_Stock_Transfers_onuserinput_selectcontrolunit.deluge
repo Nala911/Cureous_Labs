@@ -1,0 +1,18 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On User Input)
+   Trigger Hook : Form Actions -> On User Input -> Field: Select_Control_Unit
+   File Path    : scripts/07_stock_transfers/2_4_Stock_Transfers_onuserinput_selectcontrolunit.deluge
+   Purpose      : Dynamically updates the Control Unit count whenever items are
+                  selected or deselected from the multi-select lookup.
+   Optimization : Zero database queries consumed.
+============================================================================== */
+
+if(input.Select_Control_Unit != null)
+{
+    input.Control_Unit_Number = input.Select_Control_Unit.size();
+}
+else
+{
+    input.Control_Unit_Number = 0;
+}

@@ -1,0 +1,12 @@
+/* ==============================================================================
+   Module Name  : Lots (Form Link Name: Lots)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created -> Form Actions -> On Success
+   File Path    : scripts/01_lots/4_Lots_onsuccess.deluge
+   Purpose      : Navigates immediately to the 'All_Lots' report upon successful
+                  record creation, terminating the submit loading spinner cleanly.
+   Optimization : 0 database queries consumed.
+============================================================================== */
+
+// Redirect cleanly to the All_Lots report (instantly dismisses submit loader)
+openUrl("#Report:All_Lots", "same window");

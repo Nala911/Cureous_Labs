@@ -1,0 +1,78 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge
+   Fields Used  : [Transfer_Type, Transfer_Date, Source_Office, Source_Customer, Destination_Office, Destination_Customer, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number, Transfer_Status]
+   Cross-Forms  : None
+   Purpose      : Intelligent Progressive Disclosure UX:
+                  In Add mode, Transfer Type and Transfer Date are user entry fields.
+                  Control Unit # and Overlay # are disabled to provide visual context.
+                  Transfer Status is hidden and auto-initialized to "Draft".
+                  (Note: Stock_Transfer_ID is an Auto-Number field, so Zoho Creator
+                  automatically hides it on Add mode and locks it in Edit mode).
+                  Directional routing fields (Source/Destination Office/Customer) and hardware
+                  selection lookups are hidden until triggered by user input of Transfer Type.
+                  In Edit mode, routing parameters are locked and Transfer Status is enabled.
+   Optimization : Zero database queries consumed. Runs in <5ms.
+============================================================================== */
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: User Entry Starting Fields
+    enable Transfer_Type;
+    show Transfer_Type;
+    
+    input.Transfer_Date = zoho.currentdate;
+    enable Transfer_Date;
+    show Transfer_Date;
+    
+    // 2. Context Fields: Disabled to enter, gives context to the user
+    input.Control_Unit_Number = 0;
+    input.Overlay_Number = 0;
+    disable Control_Unit_Number;
+    disable Overlay_Number;
+    show Control_Unit_Number;
+    show Overlay_Number;
+    
+    // 3. Status Field: Hidden while entering new transfer; auto-defaults to Draft
+    // (Note: Stock_Transfer_ID is an Auto-Number field, automatically hidden by Zoho Creator)
+    hide Transfer_Status;
+    input.Transfer_Status = "Draft";
+    
+    // 4. Directional lookups hidden and disabled until Transfer Type is selected
+    hide Source_Office;
+    hide Source_Customer;
+    hide Destination_Office;
+    hide Destination_Customer;
+    
+    disable Source_Office;
+    disable Source_Customer;
+    disable Destination_Office;
+    disable Destination_Customer;
+    
+    // 5. Hardware selection lookups hidden and disabled until Source is chosen
+    hide Select_Control_Unit;
+    hide Select_Overlay;
+    disable Select_Control_Unit;
+    disable Select_Overlay;
+}
+else
+{
+    // 6. EDIT Mode: Maintain Data Integrity
+    // Routing parameters and device selections cannot be altered once record is created
+    disable Transfer_Type;
+    disable Transfer_Date;
+    disable Source_Office;
+    disable Source_Customer;
+    disable Destination_Office;
+    disable Destination_Customer;
+    disable Select_Control_Unit;
+    disable Select_Overlay;
+    disable Control_Unit_Number;
+    disable Overlay_Number;
+    
+    // Display and allow updating Transfer Status (for dispatchers / delivery staff)
+    show Transfer_Status;
+    enable Transfer_Status;
+}

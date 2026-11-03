@@ -1,0 +1,12 @@
+/* ==============================================================================
+   Module Name  : Customers (Form Link Name: Customers)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created -> Form Actions -> On Success
+   File Path    : scripts/02_customers/4_Customers_onsuccess.deluge
+   Purpose      : Navigates cleanly to the 'All_Customers' report upon successful
+                  save, eliminating submit spinner delays.
+   Optimization : 0 database queries consumed.
+============================================================================== */
+
+// 1. Redirect cleanly to the All_Customers report (instantly dismisses submit loader)
+openUrl("#Report:All_Customers", "same window");

@@ -1,0 +1,79 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On User Input)
+   Trigger Hook : Form Actions -> On User Input -> Field: Source_Office
+   File Path    : scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge
+   Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number]
+   Cross-Forms  : [Locations, Devices]
+   Purpose      : 1. Filters Destination Office choices for 'Inter Branch' transfers to
+                     exclude the selected Source Office (preventing duplicate routing).
+                  2. Dynamically queries and populates available Control Units and
+                     Overlays physically located at the selected Source Office,
+                     displaying their Serial Numbers directly.
+                  3. Resets hardware selections and counts on source change.
+   Optimization : 2 targeted indexed queries to fetch available device serial numbers. Runs in <20ms.
+============================================================================== */
+
+// 1. Reset device selections and counters on Source change
+input.Select_Control_Unit = null;
+input.Select_Overlay = null;
+input.Control_Unit_Number = 0;
+input.Overlay_Number = 0;
+
+if(input.Source_Office != null)
+{
+    // 2. Inter Branch Routing: Filter Destination Office choices to exclude selected Source Office
+    if(input.Transfer_Type == "Inter Branch")
+    {
+        available_destinations = Locations[ID != input.Source_Office].ID.getAll();
+        input.Destination_Office:ui.add(available_destinations);
+        
+        // If Destination Office was already set to the newly chosen Source Office, clear it
+        if(input.Destination_Office == input.Source_Office)
+        {
+            input.Destination_Office = null;
+        }
+    }
+    
+    // 3. Reveal and activate hardware selection lookups
+    show Select_Control_Unit;
+    show Select_Overlay;
+    enable Select_Control_Unit;
+    enable Select_Overlay;
+    
+    // Explicitly clear lookup choices prior to adding filtered records
+    clear input.Select_Control_Unit;
+    clear input.Select_Overlay;
+    
+    // 4. Query and populate available Control Units at this Source Office by Serial Number
+    available_cus = Devices[Current_Location == input.Source_Office && Device_Type == "Control Unit" && (Current_Custody == "Internal Office" || Current_Custody == null || Current_Custody == "") && (Rental_State == "Inactive" || Rental_State == null || Rental_State == "")].Serial_Number.getAll();
+    input.Select_Control_Unit:ui.add(available_cus);
+    
+    // 5. Query and populate available Overlays at this Source Office by Serial Number
+    available_ovs = Devices[Current_Location == input.Source_Office && Device_Type == "Overlay" && (Current_Custody == "Internal Office" || Current_Custody == null || Current_Custody == "") && (Rental_State == "Inactive" || Rental_State == null || Rental_State == "")].Serial_Number.getAll();
+    input.Select_Overlay:ui.add(available_ovs);
+    
+    // Friendly user feedback if the selected office has no available inventory
+    if(available_cus.size() == 0 && available_ovs.size() == 0)
+    {
+        alert "Notice: No available Control Units or Overlays are currently in stock at the selected location.";
+    }
+}
+else
+{
+    // If Source Office is cleared: Lock and clear selection fields
+    clear input.Select_Control_Unit;
+    clear input.Select_Overlay;
+    
+    hide Select_Control_Unit;
+    hide Select_Overlay;
+    disable Select_Control_Unit;
+    disable Select_Overlay;
+    
+    // Reset Destination Office options to all locations for Inter Branch
+    if(input.Transfer_Type == "Inter Branch")
+    {
+        all_destinations = Locations[ID != null].ID.getAll();
+        input.Destination_Office:ui.add(all_destinations);
+    }
+}

@@ -1,0 +1,8 @@
+/* ==============================================================================
+   Module Name  : Locations (Form Link Name: Locations)
+   Script Type  : Field Workflow (On User Input) - DEPRECATED / NOT REQUIRED
+   File Path    : scripts/03_locations/2_1_Locations_onuserinput_locationnameselect.deluge
+   Status       : Obsolete
+   Reason       : Replaced by direct user input on Location_Name and Location_ID.
+                  No On User Input script is needed for the Locations form.
+============================================================================== */

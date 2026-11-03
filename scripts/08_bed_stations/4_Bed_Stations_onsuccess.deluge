@@ -1,0 +1,107 @@
+/* ==============================================================================
+   Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created or Edited -> Form Actions -> On Success
+   File Path    : scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge
+   Fields Used  : [Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date]
+   Cross-Forms  : [Devices, Rental_Agreements, Bed_Station_Logs]
+   Purpose      : Synchronizes hardware asset custody in Devices (marking assets as
+                  "Deployed - Active on Bed" and linking Customer), updates the live
+                  Active_Deployed_Stations counter on the parent Rental Agreement,
+                  maintains the active pairing interval in Bed_Station_Logs, and
+                  dismisses the submit loader by redirecting to All_Bed_Stations.
+   Optimization : Atomic updates with targeted criteria. Minimal statement footprint.
+============================================================================== */
+
+// 1. Synchronize Physical Hardware Custody in Devices Master
+if(input.Control_Unit != null)
+{
+    cu_dev = Devices[ID == input.Control_Unit];
+    if(cu_dev.count() > 0)
+    {
+        if(input.Deployment_Status == "Active")
+        {
+            cu_dev.Rental_State = "Active";
+            cu_dev.Current_Custody = "Customer's Site";
+            cu_dev.Current_Customer = input.Customer;
+        }
+        else if(input.Deployment_Status == "Closed")
+        {
+            cu_dev.Rental_State = "Inactive";
+            cu_dev.Current_Custody = "Customer's Site";
+        }
+    }
+}
+
+if(input.Overlay_Asset != null)
+{
+    ov_dev = Devices[ID == input.Overlay_Asset];
+    if(ov_dev.count() > 0)
+    {
+        if(input.Deployment_Status == "Active")
+        {
+            ov_dev.Rental_State = "Active";
+            ov_dev.Current_Custody = "Customer's Site";
+            ov_dev.Current_Customer = input.Customer;
+        }
+        else if(input.Deployment_Status == "Closed")
+        {
+            ov_dev.Rental_State = "Inactive";
+            ov_dev.Current_Custody = "Customer's Site";
+        }
+    }
+}
+
+// 2. Synchronize Parent Rental Agreement Active Deployed Stations Counter
+if(input.Rental_Agreement != null)
+{
+    active_count = Bed_Stations[Rental_Agreement == input.Rental_Agreement && Deployment_Status == "Active"].count();
+    agr_rec = Rental_Agreements[ID == input.Rental_Agreement];
+    if(agr_rec.count() > 0)
+    {
+        agr_rec.Active_Deployed_Stations = active_count;
+    }
+}
+
+// 3. Maintain Historical Timeline in Bed Station Logs (Interval Ledger)
+if(input.Deployment_Status == "Active")
+{
+    // Check if an active interval already exists for this bed station (open interval where Period_End_Date is null)
+    existing_active_log = Bed_Station_Logs[Bed_Station == input.ID && Period_End_Date == null];
+    if(existing_active_log.count() == 0)
+    {
+        // Generate formatted sequence if not native auto-number
+        log_seq = Bed_Station_Logs.count() + 1;
+        log_id_code = "BSL-" + zoho.currentdate.getYear() + "-" + log_seq.leftPad(4, "0");
+        
+        insert into Bed_Station_Logs
+        [
+            Bed_Station_Log_ID = log_id_code,
+            Bed_Station = input.ID,
+            Customer = input.Customer,
+            Rental_Agreement = input.Rental_Agreement,
+            Control_Unit = input.Control_Unit,
+            Overlay = input.Overlay_Asset,
+            Period_Start_Date = ifnull(input.Deployment_Start_Date, zoho.currenttime)
+        ];
+    }
+}
+else if(input.Deployment_Status == "Closed")
+{
+    // Close any active pairing logs when the Bed Station is decommissioned
+    active_logs = Bed_Station_Logs[Bed_Station == input.ID && Period_End_Date == null];
+    for each log in active_logs
+    {
+        close_ts = ifnull(input.Deployment_End_Date, zoho.currenttime);
+        log.Period_End_Date = close_ts;
+        
+        // Calculate operating duration in days
+        if(log.Period_Start_Date != null)
+        {
+            duration_hours = (close_ts - log.Period_Start_Date) / (1000 * 3600);
+            log.Duration_Days = (duration_hours / 24).round(2);
+        }
+    }
+}
+
+// 4. Submission Complete: Native Creator submission handling manages modal closure and report refresh.

@@ -1,0 +1,68 @@
+/* ==============================================================================
+   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+   Script Type  : Field Workflow (On User Input)
+   Trigger Hook : Field Actions -> Customer -> On User Input
+   File Path    : scripts/06_rental_agreements/2_2_Rental_Agreements_onuserinput_customer.deluge
+   Fields Used  : [Customer, Rental_Item, Rental_Agreement_ID, Agreement_Title]
+   Cross-Forms  : [Customers, Product_Catalog]
+   Purpose      : When Customer is selected or changed, dynamically generates or updates
+                  the default Agreement Title (Customer Name - Rental Item Name (ID))
+                  while leaving it fully editable by the user.
+   Optimization : Single indexed lookup on Customers and Product_Catalog.
+============================================================================== */
+
+if(input.Customer != null)
+{
+    cust_rec = Customers[ID == input.Customer];
+    cust_name = ifnull(cust_rec.Customer_Name, "");
+    
+    // Auto-generate Rental Agreement ID in background if not yet created
+    if(input.Rental_Agreement_ID == null || input.Rental_Agreement_ID.trim() == "")
+    {
+        current_year = zoho.currentdate.getYear();
+        agreement_count = Rental_Agreements[ID != null].count() + 1;
+        formatted_seq = agreement_count.toString().leftPad(4).replaceAll(" ", "0");
+        input.Rental_Agreement_ID = "RA-" + current_year + "-" + formatted_seq;
+    }
+    
+    // If Rental Item is already selected, combine Customer Name and Item Name
+    if(input.Rental_Item != null)
+    {
+        item_rec = Product_Catalog[ID == input.Rental_Item];
+        item_name = ifnull(item_rec.Item_Name, "");
+        
+        if(cust_name != "" && item_name != "")
+        {
+            input.Agreement_Title = cust_name + " - " + item_name + " (" + input.Rental_Agreement_ID + ")";
+        }
+        else if(cust_name != "")
+        {
+            input.Agreement_Title = cust_name;
+        }
+    }
+    else if(cust_name != "")
+    {
+        input.Agreement_Title = cust_name;
+    }
+}
+else
+{
+    // Customer selection cleared: If item is still chosen, retain item in title, else clear
+    if(input.Rental_Item != null)
+    {
+        item_rec = Product_Catalog[ID == input.Rental_Item];
+        item_name = ifnull(item_rec.Item_Name, "");
+        if(input.Rental_Agreement_ID != null && input.Rental_Agreement_ID != "")
+        {
+            input.Agreement_Title = item_name + " (" + input.Rental_Agreement_ID + ")";
+        }
+        else
+        {
+            input.Agreement_Title = item_name;
+        }
+    }
+    else
+    {
+        input.Agreement_Title = "";
+    }
+}

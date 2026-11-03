@@ -1,0 +1,24 @@
+/* ==============================================================================
+   Module Name  : Locations (Form Link Name: Locations)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created or Edited -> Form Actions -> On Success
+   File Path    : scripts/03_locations/4_Locations_onsuccess.deluge
+   Purpose      : Enforces the Single Primary Hub rule across all locations and
+                  redirects cleanly to the 'All_Locations' report view.
+   Optimization : Atomic update on existing primary hub only if changed.
+                  Minimal statements.
+============================================================================== */
+
+// 1. Single Primary Hub Enforcement
+if(input.Is_Primary == true)
+{
+    // Unset Is_Primary on any other existing locations
+    other_primaries = Locations[Is_Primary == true && ID != input.ID];
+    for each other_hub in other_primaries
+    {
+        other_hub.Is_Primary = false;
+    }
+}
+
+// 2. Redirect cleanly to the All_Locations report view (instantly dismisses submit loader)
+openUrl("#Report:All_Locations", "same window");

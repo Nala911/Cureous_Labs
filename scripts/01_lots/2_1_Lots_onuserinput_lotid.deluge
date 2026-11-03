@@ -1,0 +1,12 @@
+/* ==============================================================================
+   Module Name  : Lots (Form Link Name: Lots)
+   Script Type  : Field Workflow (On User Input) - [DISCONTINUED / NOT REQUIRED]
+   Trigger Hook : Field Actions -> Lot_ID -> On User Input
+   File Path    : scripts/01_lots/2_1_Lots_onuserinput_lotid.deluge
+   Purpose      : No real-time parsing is required on user input of Lot_ID.
+                  This workflow can be deleted or disabled in Zoho Creator.
+                  Rollup counters default automatically on submission.
+   Optimization : Zero client-server roundtrips on keystroke; eliminates UI lag.
+============================================================================== */
+
+// No script required. Real-time parsing of Year, Month, and Sequence is discontinued.

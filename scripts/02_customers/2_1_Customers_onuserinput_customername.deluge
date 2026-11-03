@@ -1,0 +1,176 @@
+/* ==============================================================================
+   Module Name  : Customers (Form Link Name: Customers)
+   Script Type  : Field Workflow (On User Input)
+   Trigger Hook : Field Actions -> Customer_Name -> On User Input
+   File Path    : scripts/02_customers/2_1_Customers_onuserinput_customername.deluge
+   Fields Used  : [Customer_Name, Customer_ID, Customer_Type, Billing_Address, Customer_Status]
+   Cross-Forms  : None (Integrates with Zoho Books API)
+   Purpose      : Validates selection, guards against duplicate entry, queries
+                  Zoho Books via native integration, and auto-populates Customer ID,
+                  Customer Type, formatted Multi-Line Billing Address with statutory
+                  GSTIN and operational Contact (Phone/Email), and Status.
+   Optimization : Uses targeted search_text query to avoid iterating 200 records.
+                  Wrapped in try-catch guard.
+============================================================================== */
+
+if(input.Customer_Name != null && input.Customer_Name.trim() != "")
+{
+    // 1. Fast Duplicate Guard: Verify if customer is already onboarded
+    existing_count = Customers[Customer_Name == input.Customer_Name && ID != input.ID].count();
+    if(existing_count > 0)
+    {
+        alert "Customer Already Onboarded:\n\n'" + input.Customer_Name + "' is already registered in the system.\n\nPlease select an un-onboarded customer from the list.";
+        input.Customer_ID = "";
+        input.Customer_Type = null;
+        input.Billing_Address = "";
+        input.Customer_Status = null;
+        return;
+    }
+    
+    try 
+    {
+        // 2. Fetch Zoho Books Organization ID dynamically
+        org_id = "";
+        org_resp = zoho.books.getOrganizations();
+        if(org_resp.get("code") == 0)
+        {
+            org_list = org_resp.get("organizations");
+            if(org_list.size() > 0)
+            {
+                org_id = org_list.get(0).get("organization_id").toString();
+            }
+        }
+        
+        // Fallback: If you prefer to set your Organization ID directly, uncomment below:
+        // org_id = "YOUR_ORGANIZATION_ID";
+        
+        if(org_id != "")
+        {
+            // 3. Fast targeted query: Search Books by exact contact name instead of scanning all 200 contacts
+            query_params = "search_text=" + zoho.encryption.urlEncode(input.Customer_Name);
+            search_resp = zoho.books.getRecords("contacts", org_id, query_params);
+            
+            if(search_resp.get("code") == 0 && search_resp.get("contacts").size() > 0)
+            {
+                matched_contact = null;
+                for each contact in search_resp.get("contacts")
+                {
+                    if(contact.get("contact_name") == input.Customer_Name)
+                    {
+                        matched_contact = contact;
+                        break;
+                    }
+                }
+                
+                if(matched_contact != null)
+                {
+                    // A. Customer ID (Zoho Books Primary Key)
+                    c_id = matched_contact.get("contact_id");
+                    input.Customer_ID = c_id.toString();
+                    
+                    // B. Customer Type (Business vs Individual)
+                    c_sub = matched_contact.get("customer_sub_type");
+                    if(c_sub == "business")
+                    {
+                        input.Customer_Type = "Business";
+                    }
+                    else
+                    {
+                        input.Customer_Type = "Individual";
+                    }
+                    
+                    // C. Retrieve full contact details via getRecordsByID for address, GSTIN, and contact info
+                    full_resp = zoho.books.getRecordsByID("contacts", org_id, c_id.toString());
+                    
+                    b_text = "";
+                    gst_no = "";
+                    gst_treatment = "";
+                    phone_no = "";
+                    email_id = "";
+                    
+                    if(full_resp.get("code") == 0 && full_resp.get("contact") != null)
+                    {
+                        full_contact = full_resp.get("contact");
+                        
+                        // Extract statutory & contact information
+                        gst_no = ifnull(full_contact.get("gst_no"), "");
+                        gst_treatment = ifnull(full_contact.get("gst_treatment"), "");
+                        
+                        phone_no = ifnull(full_contact.get("phone"), "");
+                        if(phone_no == "") { phone_no = ifnull(full_contact.get("mobile"), ""); }
+                        email_id = ifnull(full_contact.get("email"), "");
+                        
+                        // Format Billing Address
+                        b_map = full_contact.get("billing_address");
+                        if(b_map != null)
+                        {
+                            if(b_map.get("address") != null && b_map.get("address") != "") { b_text = b_text + b_map.get("address") + "\n"; }
+                            if(b_map.get("street2") != null && b_map.get("street2") != "") { b_text = b_text + b_map.get("street2") + "\n"; }
+                            csz = "";
+                            if(b_map.get("city") != null && b_map.get("city") != "") { csz = csz + b_map.get("city"); }
+                            if(b_map.get("state") != null && b_map.get("state") != "") { csz = if(csz != "", csz + ", ", "") + b_map.get("state"); }
+                            if(b_map.get("zip") != null && b_map.get("zip") != "") { csz = if(csz != "", csz + " - ", "") + b_map.get("zip"); }
+                            if(csz != "") { b_text = b_text + csz + "\n"; }
+                            if(b_map.get("country") != null && b_map.get("country") != "") { b_text = b_text + b_map.get("country") + "\n"; }
+                        }
+                    }
+                    
+                    // Fallback to summary map if detail address was blank
+                    if(b_text == "")
+                    {
+                        b_map = matched_contact.get("billing_address");
+                        if(b_map != null)
+                        {
+                            if(b_map.get("address") != null && b_map.get("address") != "") { b_text = b_text + b_map.get("address") + "\n"; }
+                            if(b_map.get("street2") != null && b_map.get("street2") != "") { b_text = b_text + b_map.get("street2") + "\n"; }
+                            csz = "";
+                            if(b_map.get("city") != null && b_map.get("city") != "") { csz = csz + b_map.get("city"); }
+                            if(b_map.get("state") != null && b_map.get("state") != "") { csz = if(csz != "", csz + ", ", "") + b_map.get("state"); }
+                            if(b_map.get("zip") != null && b_map.get("zip") != "") { csz = if(csz != "", csz + " - ", "") + b_map.get("zip"); }
+                            if(csz != "") { b_text = b_text + csz + "\n"; }
+                            if(b_map.get("country") != null && b_map.get("country") != "") { b_text = b_text + b_map.get("country") + "\n"; }
+                        }
+                    }
+                    
+                    // Append Statutory & Contact Details for high operational clarity
+                    meta_info = "";
+                    if(gst_no != null && gst_no.trim() != "")
+                    {
+                        meta_info = meta_info + "GSTIN: " + gst_no.trim() + "\n";
+                    }
+                    else if(gst_treatment != null && gst_treatment.trim() != "")
+                    {
+                        meta_info = meta_info + "GST: " + gst_treatment.trim() + "\n";
+                    }
+                    
+                    contact_line = "";
+                    if(phone_no != null && phone_no.trim() != "") { contact_line = "Phone: " + phone_no.trim(); }
+                    if(email_id != null && email_id.trim() != "") { contact_line = if(contact_line != "", contact_line + " | ", "") + "Email: " + email_id.trim(); }
+                    if(contact_line != "") { meta_info = meta_info + contact_line + "\n"; }
+                    
+                    if(meta_info != "")
+                    {
+                        b_text = b_text.trim() + "\n----------------------------------------\n" + meta_info.trim();
+                    }
+                    
+                    input.Billing_Address = b_text.trim();
+                    
+                    // D. Set Default Status
+                    input.Customer_Status = "Active";
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        alert "Notice: Could not load contact details from Zoho Books automatically. Error: " + e;
+    }
+}
+else
+{
+    // Selection cleared: Reset all dependent auto-derived fields
+    input.Customer_ID = "";
+    input.Customer_Type = null;
+    input.Billing_Address = "";
+    input.Customer_Status = null;
+}

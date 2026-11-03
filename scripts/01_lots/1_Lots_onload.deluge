@@ -1,0 +1,50 @@
+/* ==============================================================================
+   Module Name  : Lots (Form Link Name: Lots)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/01_lots/1_Lots_onload.deluge
+   Fields Used  : [Lot_ID, Total_CUs_Count, Total_Overlays_Count, Total_Units_Count, CUs_In_Progress, CUs_Rent_Ready, Overlays_In_Progress, Overlays_Rent_Ready]
+   Cross-Forms  : None
+   Purpose      : Intelligent Form UX: In Add mode, Lot ID is the ONLY field for user
+                  entry. All metrical rollup fields are completely hidden to avoid
+                  cluttering the screen on new lot creation. In Edit mode, Lot ID
+                  is locked and all metrics are locked as read-only.
+   Optimization : Zero database queries, minimal statements.
+============================================================================== */
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: 'Lot ID' is the only field for user entry
+    enable Lot_ID;
+    show Lot_ID;
+    
+    // Hide all metric rollup counters (irrelevant during new lot creation; shown only in reports)
+    hide Total_CUs_Count;
+    hide Total_Overlays_Count;
+    hide Total_Units_Count;
+    hide CUs_In_Progress;
+    hide CUs_Rent_Ready;
+    hide Overlays_In_Progress;
+    hide Overlays_Rent_Ready;
+}
+else
+{
+    // 2. EDIT Mode: Protect Lot_ID once created; display locked metrics
+    disable Lot_ID;
+    
+    disable Total_CUs_Count;
+    disable Total_Overlays_Count;
+    disable Total_Units_Count;
+    disable CUs_In_Progress;
+    disable CUs_Rent_Ready;
+    disable Overlays_In_Progress;
+    disable Overlays_Rent_Ready;
+    
+    show Total_CUs_Count;
+    show Total_Overlays_Count;
+    show Total_Units_Count;
+    show CUs_In_Progress;
+    show CUs_Rent_Ready;
+    show Overlays_In_Progress;
+    show Overlays_Rent_Ready;
+}

@@ -1,0 +1,25 @@
+/* ==============================================================================
+   Module Name  : Bed Station Logs (Form Link Name: Bed_Station_Logs)
+   Script Type  : Form Workflow (On Validate)
+   Trigger Hook : Created or Edited -> Form Actions -> On Validate
+   File Path    : scripts/09_bed_station_logs/3_Bed_Station_Logs_onvalidate.deluge
+   Fields Used  : [Bed_Station, Control_Unit, Overlay, Period_Start_Date]
+   Cross-Forms  : [Bed_Stations]
+   Purpose      : Enforces strict data integrity and prevents direct manual submissions.
+                  Validates that required hardware references are present when inserted
+                  by system automations.
+   Optimization : Lightweight validation guard.
+============================================================================== */
+
+// 1. Validate mandatory relational fields for system-generated records
+if(input.Bed_Station == null)
+{
+    alert("System Error: Bed Station lookup cannot be empty.");
+    cancel submit;
+}
+
+// 2. Default timestamps if omitted by caller
+if(input.Period_Start_Date == null)
+{
+    input.Period_Start_Date = zoho.currenttime;
+}

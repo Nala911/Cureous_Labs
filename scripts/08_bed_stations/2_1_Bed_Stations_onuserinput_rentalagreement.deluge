@@ -1,0 +1,93 @@
+/* ==============================================================================
+   Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+   Script Type  : Field Workflow (On User Input)
+   Trigger Hook : Field Actions -> Rental_Agreement -> On User Input
+   File Path    : scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_rentalagreement.deluge
+   Fields Used  : [Rental_Agreement, Customer, Product_Model, Bed_Station_ID, Bed_Label, Bed_Station_Title, Deployment_Status]
+   Cross-Forms  : [Rental_Agreements, Customers, Product_Catalog]
+   Purpose      : When Rental Agreement is selected, auto-fills Customer and Product
+                  Model into disabled context fields. Auto-generates Bed Station ID
+                  and composes Bed Station Title while leaving title user-editable.
+                  Provides non-blocking warning if agreement is Fixed Monthly and
+                  already has an active Bed Station attached.
+   Optimization : Max 1 indexed query on Rental_Agreements, Customers, Product_Catalog.
+============================================================================== */
+
+if(input.Rental_Agreement != null)
+{
+    agr_rec = Rental_Agreements[ID == input.Rental_Agreement];
+    if(agr_rec.count() > 0)
+    {
+        // 1. Auto-fill Customer (Disabled context field)
+        input.Customer = agr_rec.Customer;
+        cust_name = "";
+        if(agr_rec.Customer != null)
+        {
+            cust_rec = Customers[ID == agr_rec.Customer];
+            cust_name = ifnull(cust_rec.Customer_Name, "");
+        }
+        
+        // 2. Auto-fill Product Model (Disabled context field)
+        if(agr_rec.Rental_Item != null)
+        {
+            item_rec = Product_Catalog[ID == agr_rec.Rental_Item];
+            if(item_rec.count() > 0)
+            {
+                input.Product_Model = ifnull(item_rec.Product_Model, "");
+            }
+        }
+        
+        // 3. Ensure Bed Station ID is assigned
+        if(input.Bed_Station_ID == null || input.Bed_Station_ID.trim() == "")
+        {
+            current_year = zoho.currentdate.getYear();
+            bst_count = Bed_Stations[ID != null].count() + 1;
+            formatted_seq = bst_count.toString().leftPad(4).replaceAll(" ", "0");
+            input.Bed_Station_ID = "BST-" + current_year + "-" + formatted_seq;
+        }
+        
+        // 4. Auto-fill Bed Station Title (User is allowed to edit)
+        if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+        {
+            if(cust_name != "")
+            {
+                input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim() + " (" + input.Bed_Station_ID + ")";
+            }
+            else
+            {
+                input.Bed_Station_Title = input.Bed_Label.trim() + " (" + input.Bed_Station_ID + ")";
+            }
+        }
+        else if(cust_name != "")
+        {
+            input.Bed_Station_Title = cust_name + " (" + input.Bed_Station_ID + ")";
+        }
+        
+        // 5. Fixed Monthly Agreement Guard Check (1-to-1 Rule Warning)
+        if(agr_rec.Billing_Unit == "Month")
+        {
+            existing_active = Bed_Stations[Rental_Agreement == input.Rental_Agreement && Deployment_Status == "Active" && ID != input.ID];
+            if(existing_active.count() > 0)
+            {
+                alert "Fixed Monthly Agreement Alert:\n\nThis agreement ('" + agr_rec.Agreement_Title + "') already has an active Bed Station assigned (" + existing_active.Bed_Station_ID.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time.";
+            }
+        }
+    }
+}
+else
+{
+    // Selection cleared: Reset auto-derived fields
+    input.Customer = null;
+    input.Product_Model = "";
+    
+    // Reset title to bed label if present, else clear
+    if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+    {
+        bst_id = ifnull(input.Bed_Station_ID, "");
+        input.Bed_Station_Title = input.Bed_Label.trim() + if(bst_id != "", " (" + bst_id + ")", "");
+    }
+    else
+    {
+        input.Bed_Station_Title = "";
+    }
+}

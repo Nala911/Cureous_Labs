@@ -1,0 +1,13 @@
+/* ==============================================================================
+   Module Name  : Devices (Form Link Name: Devices)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created -> Form Actions -> On Success
+   File Path    : scripts/05_devices/4_Devices_onsuccess.deluge
+   Purpose      : Handles successful device record creation. Relies on native Zoho Creator
+                  submission handling to prevent infinite loading spinners on modal forms.
+   Optimization : 0 database queries consumed.
+============================================================================== */
+
+// Record successfully saved.
+// Note: Client-side openUrl is omitted to prevent modal submission hanging.
+// Configure post-submission navigation natively in Form Properties -> On Successful Submission.

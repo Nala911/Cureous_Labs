@@ -1,0 +1,58 @@
+/* ==============================================================================
+   Module Name  : Lots (Form Link Name: Lots)
+   Script Type  : Form Workflow (On Validate)
+   Trigger Hook : Created or Edited -> Form Actions -> On Validate
+   File Path    : scripts/01_lots/3_Lots_onvalidate.deluge
+   Purpose      : Validates Lot ID presence and uniqueness, sanitizes input,
+                  and guarantees counter defaults before record commit.
+   Optimization : Max 1 indexed query for duplicate check on Add/Edit.
+============================================================================== */
+
+// 1. Mandatory Check
+if(input.Lot_ID == null || input.Lot_ID.trim() == "")
+{
+    alert "Lot ID is mandatory. Please enter a valid Lot ID.";
+    cancel submit;
+}
+
+// 2. Sanitize Input (Trim whitespace and uppercase)
+clean_lot = input.Lot_ID.trim().toUpperCase();
+input.Lot_ID = clean_lot;
+
+// 3. Minimum Length Guard
+if(clean_lot.length() < 3)
+{
+    alert "Invalid Lot ID: Minimum length is 3 characters. Please enter a valid Lot ID.";
+    cancel submit;
+}
+
+// 4. Duplicate Check in 'Lots' Form
+if(input.ID == null)
+{
+    // New Record: check if Lot_ID already exists
+    existing_lots = Lots[Lot_ID == clean_lot];
+    if(existing_lots.count() > 0)
+    {
+        alert "Duplicate Lot ID: Manufacturing lot '" + clean_lot + "' already exists in the system.\n\nPlease check the Lot ID or use the existing lot from the Lots report.";
+        cancel submit;
+    }
+}
+else
+{
+    // Existing Record (Edit): ensure no other record has this Lot_ID
+    existing_lots = Lots[Lot_ID == clean_lot && ID != input.ID];
+    if(existing_lots.count() > 0)
+    {
+        alert "Duplicate Lot ID: Another record already exists with Lot ID '" + clean_lot + "'.\n\nPlease enter a unique Lot ID.";
+        cancel submit;
+    }
+}
+
+// 5. Default Numeric Counters to 0 if Null
+if(input.Total_CUs_Count == null) { input.Total_CUs_Count = 0; }
+if(input.Total_Overlays_Count == null) { input.Total_Overlays_Count = 0; }
+if(input.Total_Units_Count == null) { input.Total_Units_Count = 0; }
+if(input.CUs_In_Progress == null) { input.CUs_In_Progress = 0; }
+if(input.CUs_Rent_Ready == null) { input.CUs_Rent_Ready = 0; }
+if(input.Overlays_In_Progress == null) { input.Overlays_In_Progress = 0; }
+if(input.Overlays_Rent_Ready == null) { input.Overlays_Rent_Ready = 0; }

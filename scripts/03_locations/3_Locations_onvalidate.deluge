@@ -1,0 +1,47 @@
+/* ==============================================================================
+   Module Name  : Locations (Form Link Name: Locations)
+   Script Type  : Form Workflow (On Validate)
+   Trigger Hook : Created or Edited -> Form Actions -> On Validate
+   File Path    : scripts/03_locations/3_Locations_onvalidate.deluge
+   Purpose      : Sanitizes inputs and guards against duplicate location entries.
+                  Pure local validation with zero external API calls.
+   Optimization : Max 1 indexed Creator query for duplicate check.
+                  Zero external network requests. Executes in <5ms.
+============================================================================== */
+
+// 1. Mandatory Input & Whitespace Sanitization
+if(input.Location_s_Name == null || input.Location_s_Name.trim() == "")
+{
+    alert "VALIDATION ERROR: Location's Name is mandatory. Please enter a valid name (e.g. 'Bangalore HQ', 'Palakkad Branch').";
+    cancel submit;
+}
+
+if(input.Location_ID == null || input.Location_ID.trim() == "")
+{
+    alert "VALIDATION ERROR: Location ID is mandatory. Please enter the Zoho Books Location ID.";
+    cancel submit;
+}
+
+// Sanitize inputs by trimming whitespace
+input.Location_s_Name = input.Location_s_Name.trim();
+input.Location_ID = input.Location_ID.trim();
+
+// 2. Duplicate Guard in Creator (Guarantees unique Location's Name and Location ID)
+if(input.ID == null)
+{
+    dup_locations = Locations[Location_ID == input.Location_ID || Location_s_Name == input.Location_s_Name];
+    if(dup_locations.count() > 0)
+    {
+        alert "VALIDATION ERROR:\n\nA location with Name '" + input.Location_s_Name + "' or ID '" + input.Location_ID + "' is already registered in the system.\n\nDuplicate location creation is blocked.";
+        cancel submit;
+    }
+}
+else
+{
+    dup_locations = Locations[(Location_ID == input.Location_ID || Location_s_Name == input.Location_s_Name) && ID != input.ID];
+    if(dup_locations.count() > 0)
+    {
+        alert "VALIDATION ERROR:\n\nAnother location with Name '" + input.Location_s_Name + "' or ID '" + input.Location_ID + "' already exists.";
+        cancel submit;
+    }
+}

@@ -1,0 +1,57 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On User Input)
+   Trigger Hook : Form Actions -> On User Input -> Field: Source_Customer
+   File Path    : scripts/07_stock_transfers/2_3_Stock_Transfers_onuserinput_sourcecustomer.deluge
+   Fields Used  : [Source_Customer, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number]
+   Cross-Forms  : [Devices]
+   Purpose      : 1. Dynamically queries and populates Control Units and Overlays
+                     currently deployed or held with the selected Source Customer,
+                     displaying their Serial Numbers directly.
+                  2. Activates hardware selection lookups for return to warehouse.
+                  3. Resets hardware selections and counts on customer change.
+   Optimization : 2 targeted indexed queries to fetch device serial numbers. Runs in <20ms.
+============================================================================== */
+
+// 1. Reset device selections and counters on Customer change
+input.Select_Control_Unit = null;
+input.Select_Overlay = null;
+input.Control_Unit_Number = 0;
+input.Overlay_Number = 0;
+
+if(input.Source_Customer != null)
+{
+    // 2. Reveal and activate hardware selection lookups
+    show Select_Control_Unit;
+    show Select_Overlay;
+    enable Select_Control_Unit;
+    enable Select_Overlay;
+    
+    // Explicitly clear lookup choices prior to adding filtered records
+    clear input.Select_Control_Unit;
+    clear input.Select_Overlay;
+    
+    // 3. Query and populate Control Units currently held/deployed at this customer by Serial Number
+    cust_cus = Devices[Current_Customer == input.Source_Customer && Device_Type == "Control Unit"].Serial_Number.getAll();
+    input.Select_Control_Unit:ui.add(cust_cus);
+    
+    // 4. Query and populate Overlays currently held/deployed at this customer by Serial Number
+    cust_ovs = Devices[Current_Customer == input.Source_Customer && Device_Type == "Overlay"].Serial_Number.getAll();
+    input.Select_Overlay:ui.add(cust_ovs);
+    
+    if(cust_cus.size() == 0 && cust_ovs.size() == 0)
+    {
+        alert "Notice: No devices are currently recorded as active or held with the selected customer.";
+    }
+}
+else
+{
+    // If Source Customer is cleared: Lock and clear selection fields
+    clear input.Select_Control_Unit;
+    clear input.Select_Overlay;
+    
+    hide Select_Control_Unit;
+    hide Select_Overlay;
+    disable Select_Control_Unit;
+    disable Select_Overlay;
+}

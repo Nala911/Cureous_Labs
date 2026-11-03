@@ -1,0 +1,95 @@
+/* ==============================================================================
+   Module Name  : Devices (Form Link Name: Devices)
+   Script Type  : Field Workflow (On User Input)
+   Trigger Hook : Field Actions -> Serial_Number -> On User Input
+   File Path    : scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge
+   Fields Used  : [Serial_Number, Device_Type, Device_Model, Device_Stage, Rental_State, Current_Custody, Current_Location]
+   Cross-Forms  : [Locations]
+   Purpose      : Validates Serial Number syntax, guards against duplicates,
+                  auto-derives Device Type and Device Model, initializes initial
+                  Device Stage ("0 - CU Mfg Not Yet Started" or "0 - OV Not Yet Started"),
+                  sets initial Rental State to "Inactive", initial Current Custody to
+                  "Internal Office", and auto-initializes Current Location to Primary Hub.
+   Optimization : Zero self-assignment on Serial_Number to prevent UI flickering.
+============================================================================== */
+
+if(input.Serial_Number != null && input.Serial_Number.trim() != "")
+{
+    raw_sn = input.Serial_Number.trim().toUpperCase();
+    
+    // 1. Fast Duplicate Guard: Check if Serial Number already exists
+    existing_count = Devices[Serial_Number == raw_sn && ID != input.ID].count();
+    if(existing_count > 0)
+    {
+        alert "Device Already Registered:\n\nSerial Number '" + raw_sn + "' is already registered in the system.\n\nPlease enter or scan a unique serial number.";
+        input.Device_Type = null;
+        input.Device_Model = "";
+        input.Device_Stage = null;
+        input.Rental_State = null;
+        input.Current_Custody = null;
+        input.Current_Location = null;
+        return;
+    }
+    
+    // 2. Detect Device Type & Auto-Initialize Initial Stage 0
+    if(raw_sn.contains("CU"))
+    {
+        input.Device_Type = "Control Unit";
+        input.Device_Stage = "0 - CU Mfg Not Yet Started";
+    }
+    else if(raw_sn.contains("OV"))
+    {
+        input.Device_Type = "Overlay";
+        input.Device_Stage = "0 - OV Not Yet Started";
+    }
+    else
+    {
+        alert "Unrecognized Device Type:\n\nSerial Number '" + raw_sn + "' must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+        input.Device_Type = null;
+        input.Device_Model = "";
+        input.Device_Stage = null;
+        input.Rental_State = null;
+        input.Current_Custody = null;
+        return;
+    }
+    
+    // 3. Detect Device Model (ALT/ALT4 = Altern4™, ETO = Eturnal One™)
+    if(raw_sn.startsWith("ALT4") || raw_sn.startsWith("ALT"))
+    {
+        input.Device_Model = "Altern4™";
+    }
+    else if(raw_sn.startsWith("ETO"))
+    {
+        input.Device_Model = "Eturnal One™";
+    }
+    else
+    {
+        alert "Invalid Model Prefix:\n\nSerial Number '" + raw_sn + "' must start with 'ALT4', 'ALT' (Altern4™) or 'ETO' (Eturnal One™).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+        input.Device_Model = "";
+        input.Device_Stage = null;
+        input.Rental_State = null;
+        input.Current_Custody = null;
+        return;
+    }
+    
+    // 4. Initial Rental State and Custody
+    input.Rental_State = "Inactive";
+    input.Current_Custody = "Internal Office";
+    
+    // 5. Auto-Initialize Current Location to Primary Hub
+    primary_wh = Locations[Is_Primary == true];
+    if(primary_wh.count() > 0)
+    {
+        input.Current_Location = primary_wh.ID;
+    }
+}
+else
+{
+    // Selection cleared: Reset dependent fields
+    input.Device_Type = null;
+    input.Device_Model = "";
+    input.Device_Stage = null;
+    input.Rental_State = null;
+    input.Current_Custody = null;
+    input.Current_Location = null;
+}

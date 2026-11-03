@@ -1,0 +1,123 @@
+/* ==============================================================================
+   Module Name  : Devices (Form Link Name: Devices)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/05_devices/1_Devices_onload.deluge
+   Fields Used  : [Serial_Number, Lot_Number, Device_Type, Device_Model, Device_Stage, Rental_State, Current_Custody, Current_Location, Current_Customer, Total_Cumulative_Days_Used]
+   Cross-Forms  : None
+   Purpose      : In Add mode: Enables Serial_Number and Lot_Number; keeps Device_Type
+                  and Device_Model disabled for visual context; hides lifecycle, custody,
+                  and metric fields while defaulting Total_Cumulative_Days_Used = 0.
+                  In Edit mode: Locks identity fields; enables Device_Stage and
+                  dynamically populates only the relevant stages for that hardware
+                  (Control Unit vs Overlay) to allow progressive stage updates.
+   Optimization : Zero database queries consumed. Runs in <5ms.
+============================================================================== */
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: Only Serial Number & Lot Number are user interactive
+    enable Serial_Number;
+    enable Lot_Number;
+    show Serial_Number;
+    show Lot_Number;
+    
+    // 2. Context Fields: Disabled so user sees hardware classification without editing
+    disable Device_Type;
+    disable Device_Model;
+    show Device_Type;
+    show Device_Model;
+    
+    // 3. Metric, Custody, and Lifecycle Fields: Hidden during new device creation
+    hide Current_Customer;
+    hide Current_Location;
+    hide Total_Cumulative_Days_Used;
+    hide Device_Stage;
+    hide Rental_State;
+    hide Current_Custody;
+    
+    // Initialize default counter
+    input.Total_Cumulative_Days_Used = 0;
+}
+else
+{
+    // 4. EDIT Mode: Serial Number and Lot Number are immutable
+    disable Serial_Number;
+    disable Lot_Number;
+    
+    // Context, custody, and metric fields remain locked
+    disable Rental_State;
+    disable Current_Custody;
+    disable Device_Type;
+    disable Device_Model;
+    disable Current_Location;
+    disable Current_Customer;
+    disable Total_Cumulative_Days_Used;
+    
+    show Rental_State;
+    show Current_Custody;
+    show Device_Type;
+    show Device_Model;
+    show Current_Location;
+    show Current_Customer;
+    show Total_Cumulative_Days_Used;
+    
+    // 5. Dynamic Stage Progression: Populate stages based on Device Type
+    dev_type = input.Device_Type;
+    if(dev_type == null || dev_type == "")
+    {
+        if(input.Serial_Number != null && input.Serial_Number.contains("CU"))
+        {
+            dev_type = "Control Unit";
+        }
+        else if(input.Serial_Number != null && input.Serial_Number.contains("OV"))
+        {
+            dev_type = "Overlay";
+        }
+    }
+    
+    current_stage = input.Device_Stage;
+    
+    if(dev_type == "Control Unit")
+    {
+        cu_stages = List();
+        cu_stages.add("0 - CU Mfg Not Yet Started");
+        cu_stages.add("1 - CU Enclosure Mfg in Progress");
+        cu_stages.add("2 - CU Subsystems Assembled");
+        cu_stages.add("3 - CU Yet to Assemble");
+        cu_stages.add("4 - CU Assembly in Progress");
+        cu_stages.add("5 - CU Assembly Completed & Not Tested");
+        cu_stages.add("6 - CU Ready Condition");
+        cu_stages.add("CU Retesting Needed");
+        cu_stages.add("CU Repair Needed");
+        cu_stages.add("CU Disinfection Needed");
+        
+        input.Device_Stage:ui.add(cu_stages);
+    }
+    else if(dev_type == "Overlay")
+    {
+        ov_stages = List();
+        ov_stages.add("0 - OV Not Yet Started");
+        ov_stages.add("1 - OV in Screen printing/Welding");
+        ov_stages.add("2 - OV in Stitching");
+        ov_stages.add("3 - OV Yet to Assemble");
+        ov_stages.add("4 - OV Assembly In Progress");
+        ov_stages.add("5 - OV Assembly Completed & Not Tested");
+        ov_stages.add("6 - OV Ready Condition");
+        ov_stages.add("OV Retesting Needed");
+        ov_stages.add("OV Repair Needed");
+        ov_stages.add("OV Disinfection Needed");
+        
+        input.Device_Stage:ui.add(ov_stages);
+    }
+    
+    // Re-assert current stage so selection is preserved
+    if(current_stage != null && current_stage != "")
+    {
+        input.Device_Stage = current_stage;
+    }
+    
+    // Technicians can update Device Stage through manufacturing and maintenance
+    show Device_Stage;
+    enable Device_Stage;
+}

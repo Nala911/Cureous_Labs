@@ -1,0 +1,16 @@
+/* ==============================================================================
+   Module Name  : Bed Station Logs (Form Link Name: Bed_Station_Logs)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/09_bed_station_logs/1_Bed_Station_Logs_onload.deluge
+   Fields Used  : [Bed_Station_Log_ID, Bed_Station, Customer, Rental_Agreement, Control_Unit, Overlay, Period_Start_Date, Period_End_Date, Duration_Days]
+   Cross-Forms  : [Bed_Stations]
+   Purpose      : Strictly locks the form against manual creation and editing. If a
+                  user attempts to open the raw form URL directly, it alerts and
+                  redirects them to the read-only report All_Bed_Station_Logs.
+   Optimization : Lightweight UI execution. Zero statements/queries consumed.
+============================================================================== */
+
+// Bed Station Logs is an immutable, system-generated audit ledger.
+// Direct manual entry is prohibited.
+openUrl("#Report:All_Bed_Station_Logs", "same window");

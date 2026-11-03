@@ -1,0 +1,31 @@
+/* ==============================================================================
+   Module Name  : Locations (Form Link Name: Locations)
+   Script Type  : Form Workflow (On Load)
+   Trigger Hook : Created or Edited -> Form Actions -> On Load
+   File Path    : scripts/03_locations/1_Locations_onload.deluge
+   Purpose      : Locks Location_ID in Edit mode to protect historical and downstream 
+                  integrity. In Add mode, enables all interactive fields and sets
+                  clean operational defaults. Zero external API calls.
+   Optimization : Zero database queries, zero external network requests.
+                  Executes in <5ms.
+============================================================================== */
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: Enable all interactive input fields
+    enable Location_s_Name;
+    enable Location_ID;
+    enable Is_Primary;
+    
+    // Set standard default
+    input.Is_Primary = false;
+}
+else
+{
+    // 2. EDIT Mode: Location_ID is immutable once created to safeguard delivery challans
+    disable Location_ID;
+    
+    // Keep descriptive attributes editable by authorized managers
+    enable Location_s_Name;
+    enable Is_Primary;
+}

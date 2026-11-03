@@ -1,0 +1,101 @@
+/* ==============================================================================
+   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+   Script Type  : Form Workflow (On Success)
+   Trigger Hook : Created or Edited -> Form Actions -> On Success
+   File Path    : scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge
+   Fields Used  : [Select_Control_Unit, Select_Overlay, Transfer_Status, Transfer_Type, Destination_Office, Destination_Customer]
+   Cross-Forms  : [Stock_Transfer_Items, Devices]
+   Purpose      : Automatically creates itemized child audit records in Stock_Transfer_Items
+                  for each selected Control Unit and Overlay, and transitions the physical
+                  hardware ledger (Rental_Stage & Current_Location / Current_Customer) in Devices.
+   Optimization : Removed client-side openUrl task to eliminate infinite loading spinner
+                  on modal form submissions. Relies on native Zoho Creator submission handling.
+============================================================================== */
+
+// 1. Gather all selected hardware identifiers (Serial Numbers or IDs)
+all_device_identifiers = List();
+
+if(input.Select_Control_Unit != null)
+{
+    for each cu_item in input.Select_Control_Unit
+    {
+        if(cu_item != null && cu_item.toString().trim() != "")
+        {
+            all_device_identifiers.add(cu_item.toString().trim());
+        }
+    }
+}
+
+if(input.Select_Overlay != null)
+{
+    for each ov_item in input.Select_Overlay
+    {
+        if(ov_item != null && ov_item.toString().trim() != "")
+        {
+            all_device_identifiers.add(ov_item.toString().trim());
+        }
+    }
+}
+
+// 2. Process Line Items & Update Device Custody
+if(all_device_identifiers.size() > 0)
+{
+    for each dev_ref in all_device_identifiers
+    {
+        // Search device primarily by Serial Number
+        dev = Devices[Serial_Number == dev_ref];
+        
+        // Fallback: If not found by Serial Number, check if dev_ref is a numeric Record ID
+        if(dev.count() == 0 && dev_ref.isNumber())
+        {
+            dev = Devices[ID == dev_ref.toLong()];
+        }
+        
+        // Safety Guard: Only access fields if at least one matching device record was found
+        if(dev.count() > 0)
+        {
+            d_id = dev.ID;
+            d_type = dev.Device_Type;
+            d_model = dev.Device_Model;
+            
+            // Insert audit line item into Stock_Transfer_Items
+            insert into Stock_Transfer_Items
+            [
+                Stock_Transfer_Ref = input.ID
+                Device_Ref = d_id
+                Device_Type = d_type
+                Device_Model = d_model
+            ];
+            
+            // State Machine Engine: Physical Hardware Ledger Transitions
+            if(input.Transfer_Status == "In-Transit")
+            {
+                dev.Current_Custody = "In-Transit";
+            }
+            else if(input.Transfer_Status == "Delivered")
+            {
+                if(input.Transfer_Type == "Inter Branch")
+                {
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
+                }
+                else if(input.Transfer_Type == "Office to Customer")
+                {
+                    dev.Current_Customer = input.Destination_Customer;
+                    dev.Current_Location = null;
+                    dev.Current_Custody = "Customer's Site";
+                    dev.Rental_State = "Inactive";
+                }
+                else if(input.Transfer_Type == "Customer to Office")
+                {
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
+                }
+            }
+        }
+    }
+}
