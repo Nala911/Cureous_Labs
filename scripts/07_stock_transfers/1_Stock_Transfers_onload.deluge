@@ -6,14 +6,14 @@
    Fields Used  : [Transfer_Type, Transfer_Date, Source_Office, Source_Customer, Destination_Office, Destination_Customer, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number, Transfer_Status]
    Cross-Forms  : None
    Purpose      : Intelligent Progressive Disclosure UX:
-                  In Add mode, Transfer Type and Transfer Date are user entry fields.
+                  In Add mode, Transfer Type, Transfer Date, and Transfer Status are user entry fields.
+                  Transfer Status is enabled for user input and defaults to "Dispatched".
                   Control Unit # and Overlay # are disabled to provide visual context.
-                  Transfer Status is hidden and auto-initialized to "Draft".
                   (Note: Stock_Transfer_ID is an Auto-Number field, so Zoho Creator
                   automatically hides it on Add mode and locks it in Edit mode).
                   Directional routing fields (Source/Destination Office/Customer) and hardware
                   selection lookups are hidden until triggered by user input of Transfer Type.
-                  In Edit mode, routing parameters are locked and Transfer Status is enabled.
+                  In Edit mode, routing parameters are locked and Transfer Status remains enabled.
    Optimization : Zero database queries consumed. Runs in <5ms.
 ============================================================================== */
 
@@ -35,10 +35,11 @@ if(input.ID == null)
     show Control_Unit_Number;
     show Overlay_Number;
     
-    // 3. Status Field: Hidden while entering new transfer; auto-defaults to Draft
-    // (Note: Stock_Transfer_ID is an Auto-Number field, automatically hidden by Zoho Creator)
-    hide Transfer_Status;
-    input.Transfer_Status = "Draft";
+    // 3. Status Field: Enabled for user entry; defaults to "Dispatched"
+    // User can change to "In-Transit" or "Delivered" during creation
+    show Transfer_Status;
+    enable Transfer_Status;
+    input.Transfer_Status = "Dispatched";
     
     // 4. Directional lookups hidden and disabled until Transfer Type is selected
     hide Source_Office;

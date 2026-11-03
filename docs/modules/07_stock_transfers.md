@@ -57,10 +57,10 @@ On load, only `Transfer Type` is enabled. Selecting the transfer type instantly 
 11. **Stock Transfer ID** `[Auto-Number - Native Auto-Hidden on Add]` (Primary Key, Prefix: ST-, e.g. `ST-0001`)
     - Field Link Name: `Stock_Transfer_ID`
     - Form Behavior: Natively hidden on Add by Zoho Creator; automatically visible & locked in Edit mode and reports.
-12. **Transfer Status** `[Dropdown - Hidden on Add]` (Default: `"Draft"`)
+12. **Transfer Status** `[Dropdown]` (Mandatory lifecycle status, Default: `"Dispatched"`)
     - Field Link Name: `Transfer_Status`
-    - Options: `"Draft"`, `"In-Transit"`, `"Delivered"`
-    - Form Behavior: Hidden on Add (defaults to "Draft" in background); Visible & Enabled in Edit mode for dispatchers/drivers.
+    - Options: `"Dispatched"`, `"In-Transit"`, `"Delivered"`
+    - Form Behavior: Visible & Enabled on Add (defaults to "Dispatched"); user can select "In-Transit" or "Delivered" during creation; Visible & Enabled in Edit mode for status updates.
 
 ### B. Child Audit Table: `Stock_Transfer_Items`
 *(Populated automatically by Deluge On Success. Staff never enter data here manually).*
@@ -78,7 +78,7 @@ On load, only `Transfer Type` is enabled. Selecting the transfer type instantly 
 - **File**: `scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable `Transfer_Type` and `Transfer_Date` (defaulted to `zoho.currentdate`). Disable `Control_Unit_Number` and `Overlay_Number` (context fields). Hide `Transfer_Status` (not needed while entering data; defaults to "Draft"). (Note: `Stock_Transfer_ID` is an Auto-Number field, so Zoho Creator hides it natively). Hide and disable directional routing fields and device selection lookups until triggered by user input.
+  - In ADD Mode: Enable `Transfer_Type` and `Transfer_Date` (defaulted to `zoho.currentdate`). Enable `Transfer_Status` (visible and defaulted to `"Dispatched"`). Disable `Control_Unit_Number` and `Overlay_Number` (context fields). (Note: `Stock_Transfer_ID` is an Auto-Number field, so Zoho Creator hides it natively). Hide and disable directional routing fields and device selection lookups until triggered by user input of Transfer Type.
   - In EDIT Mode: Lock primary routing parameters and device selections. Allow updates to `Transfer_Status`.
 
 ### Workflow 2: On User Input (Step 1: Transfer Type)
@@ -90,11 +90,6 @@ On load, only `Transfer Type` is enabled. Selecting the transfer type instantly 
     - `"Inter Branch"`: Show & enable `Source_Office` & `Destination_Office`; hide & disable Customer fields.
     - `"Office to Customer"`: Show & enable `Source_Office` & `Destination_Customer`; hide & disable others.
     - `"Customer to Office"`: Show & enable `Source_Customer` & `Destination_Office`; hide & disable others.
-  - Step 3: Keep `Transfer_Status` hidden during data entry.
-    - `"Inter Branch"`: Show `Source_Office` & `Destination_Office`; hide Customer fields.
-    - `"Office to Customer"`: Show `Source_Office` & `Destination_Customer`; hide others.
-    - `"Customer to Office"`: Show `Source_Customer` & `Destination_Office`; hide others.
-  - Step 3: Enable `Transfer_Status`.
 
 ### Workflow 3: On User Input (Step 2: Source Office / Source Customer)
 - **Files**:
@@ -115,7 +110,7 @@ On load, only `Transfer Type` is enabled. Selecting the transfer type instantly 
 - **File**: `scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Validate
 - **Plain English Logic**:
-  - Mandatory validation on `Transfer_Type`, Source, Destination, and `Transfer_Status`.
+  - Mandatory validation on `Transfer_Type`, Source, Destination, and `Transfer_Status` (defaults to `"Dispatched"` if blank; enforces valid choices: Dispatched, In-Transit, Delivered).
   - Conflict check: For Inter Branch, `Source_Office != Destination_Office`.
   - Inventory check: Total devices (`Control_Unit_Number + Overlay_Number`) > 0.
 
@@ -123,11 +118,12 @@ On load, only `Transfer Type` is enabled. Selecting the transfer type instantly 
 - **File**: `scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Success
 - **Plain English Logic**:
-  - Step 1: Collect selected device identifiers (Serial Numbers or IDs).
+  - Step 1: Collect selected device identifiers (from multi-select lookups in Add mode, or fallback to existing `Stock_Transfer_Items` in Edit mode).
   - Step 2: Query `Devices` using Serial Number (with ID fallback) and verify record exists (`count() > 0`).
-  - Step 3: Insert itemized audit rows into `Stock_Transfer_Items` (`Stock_Transfer_Ref = input.ID`, `Device_Ref = dev.ID`, `Device_Type = dev.Device_Type`, `Device_Model = dev.Device_Model`).
-  - Step 4: Update device custody in `Devices` based on `Transfer_Status` and `Transfer_Type`:
-    - In-Transit: `Current_Custody = "In-Transit"`.
+  - Step 3: Insert itemized audit rows into `Stock_Transfer_Items` only if not previously created for this transfer (preventing duplicates on status edit updates).
+  - Step 4: Update device physical custody and location in `Devices` based on `Transfer_Status` and `Transfer_Type`:
+    - Dispatched: `Current_Custody = "Dispatched"`, `Current_Location = null`, `Current_Customer = null`, `Rental_State = "Inactive"`.
+    - In-Transit: `Current_Custody = "In-Transit"`, `Current_Location = null`, `Current_Customer = null`, `Rental_State = "Inactive"`.
     - Inter Branch (Delivered): `Current_Location = Destination_Office`, `Current_Customer = null`, `Current_Custody = "Internal Office"`, `Rental_State = "Inactive"`.
     - Office to Customer (Delivered): `Current_Customer = Destination_Customer`, `Current_Location = null`, `Current_Custody = "Customer's Site"`, `Rental_State = "Inactive"`.
     - Customer to Office (Delivered): `Current_Location = Destination_Office`, `Current_Customer = null`, `Current_Custody = "Internal Office"`, `Rental_State = "Inactive"`.

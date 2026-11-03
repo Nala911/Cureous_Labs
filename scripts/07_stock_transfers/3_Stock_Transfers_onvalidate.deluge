@@ -3,8 +3,11 @@
    Script Type  : Form Workflow (On Validate)
    Trigger Hook : Created or Edited -> Form Actions -> On Validate
    File Path    : scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge
+   Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Control_Unit_Number, Overlay_Number, Transfer_Status]
+   Cross-Forms  : None
    Purpose      : Validates mandatory transfer routing, prevents transferring to the
-                  same branch, and enforces that at least one device is selected.
+                  same branch, ensures Transfer Status is valid, and enforces that
+                  at least one device is selected.
    Optimization : Zero database queries consumed. Runs in <10ms.
 ============================================================================== */
 
@@ -69,8 +72,13 @@ if(total_devices == 0)
     cancel submit;
 }
 
-// 4. Ensure Transfer Status is set (Hidden during data entry; auto-defaults to Draft)
+// 4. Ensure Transfer Status is set and valid
 if(input.Transfer_Status == null || input.Transfer_Status == "")
 {
-    input.Transfer_Status = "Draft";
+    input.Transfer_Status = "Dispatched";
+}
+else if(input.Transfer_Status != "Dispatched" && input.Transfer_Status != "In-Transit" && input.Transfer_Status != "Delivered")
+{
+    alert "Validation Error:\n\nInvalid Transfer Status. Please select 'Dispatched', 'In-Transit', or 'Delivered'.";
+    cancel submit;
 }

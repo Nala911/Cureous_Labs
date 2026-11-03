@@ -83,7 +83,7 @@
    - Form Behavior: Hidden on Add (defaults to "Inactive" in background); Visible & Locked in Edit mode; updated via Bed Stations (`Active` on patient bed deployment, `Inactive` when closed/buffer/warehouse).
 10. **Current Custody** `[Dropdown - Hidden on Add]` (Physical custody location tracking)
     - Field Link Name: `Current_Custody`
-    - Options: `"Internal Office"`, `"In-Transit"`, `"Customer's Site"`
+    - Options: `"Internal Office"`, `"Dispatched"`, `"In-Transit"`, `"Customer's Site"`
     - Form Behavior: Hidden on Add (defaults to "Internal Office" in background); Visible & Locked in Edit mode; updated via Stock Transfers and Bed Stations.
 *(Note: Legacy 'Rental status' field has been completely removed).*
 
