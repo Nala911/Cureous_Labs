@@ -1,0 +1,28 @@
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Control_Unit -> On User Input
+// File Path    : scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge
+// Fields Used  : [Deployment_Type, Control_Unit, Rental_Item]
+// Cross-Forms  : [Devices]
+// Purpose      : When user selects a Control Unit in "For Trial" mode (or if Rental
+//                Item is currently blank), auto-populates Rental Item from the
+//                device's classified Device Model (e.g. Altern4™, Eturnal One™).
+// Optimization : 1 indexed query on Devices. Runs in <10ms.
+// ==============================================================================
+
+if(input.Control_Unit != null)
+{
+    cu_id = input.Control_Unit;
+    cu_rec = Devices[ID == cu_id];
+    if(cu_rec.count() > 0)
+    {
+        if(input.Deployment_Type == "For Trial" || input.Rental_Item == null || input.Rental_Item == "")
+        {
+            if(cu_rec.Device_Model != null && cu_rec.Device_Model != "")
+            {
+                input.Rental_Item = cu_rec.Device_Model;
+            }
+        }
+    }
+}

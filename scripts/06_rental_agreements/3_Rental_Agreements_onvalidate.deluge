@@ -1,12 +1,14 @@
-/* ==============================================================================
-   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
-   Script Type  : Form Workflow (On Validate)
-   Trigger Hook : Created or Edited -> Form Actions -> On Validate
-   File Path    : scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge
-   Purpose      : Validates mandatory commercial fields, ensures rate > 0, enforces
-                  single active Daily agreement guard, and finalizes title/ID/Billing Unit.
-   Optimization : Max 1 indexed query. Runs in <10ms.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge
+// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Rental_Agreement_ID, Agreement_Start_Date, Billing_Unit, Agreement_Title, Agreement_Status]
+// Cross-Forms  : [Customers, Rental_Items, Rental_Agreements]
+// Purpose      : Validates mandatory commercial fields, ensures rate > 0, enforces
+//                single active Daily agreement guard, and finalizes title/ID/Billing Unit.
+// Optimization : Max 2 indexed queries. Zero try-catch blocks.
+// ==============================================================================
 
 // 1. Mandatory Field Checks
 if(input.Customer == null)
@@ -17,7 +19,7 @@ if(input.Customer == null)
 
 if(input.Rental_Item == null)
 {
-    alert "Rental Item is mandatory. Please select a rental product from the Product Catalog.";
+    alert "Rental Item is mandatory. Please select an active rental item from Rental Items.";
     cancel submit;
 }
 
@@ -42,10 +44,11 @@ if(input.Agreement_Start_Date == null)
     input.Agreement_Start_Date = zoho.currentdate;
 }
 
-// 4. Ensure Billing Unit is populated from Product Catalog
+// 4. Ensure Billing Unit is populated from Rental Items
 if(input.Billing_Unit == null || input.Billing_Unit == "")
 {
-    item_rec = Product_Catalog[ID == input.Rental_Item];
+    target_item_id = input.Rental_Item;
+    item_rec = Rental_Items[ID == target_item_id];
     if(item_rec.count() > 0)
     {
         b_unit = ifnull(item_rec.Billing_Unit, "");
@@ -67,8 +70,10 @@ if(input.Billing_Unit == null || input.Billing_Unit == "")
 // 5. Ensure Agreement Title is finalized
 if(input.Agreement_Title == null || input.Agreement_Title.trim() == "")
 {
-    cust_rec = Customers[ID == input.Customer];
-    item_rec = Product_Catalog[ID == input.Rental_Item];
+    target_cust_id = input.Customer;
+    target_item_id = input.Rental_Item;
+    cust_rec = Customers[ID == target_cust_id];
+    item_rec = Rental_Items[ID == target_item_id];
     cust_name = ifnull(cust_rec.Customer_Name, "Customer");
     item_name = ifnull(item_rec.Item_Name, "Rental Item");
     input.Agreement_Title = cust_name + " - " + item_name + " (" + input.Rental_Agreement_ID + ")";
@@ -83,9 +88,12 @@ if(input.Agreement_Status == null)
 // 7. Duplicate Guard for Daily (Pay-Per-Use) Agreements
 if(input.Billing_Unit == "Day")
 {
+    target_cust_id = input.Customer;
+    target_item_id = input.Rental_Item;
+    
     if(input.ID == null)
     {
-        existing_active = Rental_Agreements[Customer == input.Customer && Rental_Item == input.Rental_Item && Agreement_Status == "Active"];
+        existing_active = Rental_Agreements[Customer == target_cust_id && Rental_Item == target_item_id && Agreement_Status == "Active"];
         if(existing_active.count() > 0)
         {
             alert "Duplicate Daily Agreement Prevented:\n\nAn active Daily (Pay-Per-Use) agreement already exists for this Customer and Item:\n" + existing_active.Rental_Agreement_ID.getAll() + "\n\nIn Cureous PRS, a customer only needs ONE active Daily agreement per product family. Multiple bed stations are managed under this single contract.";
@@ -94,17 +102,12 @@ if(input.Billing_Unit == "Day")
     }
     else
     {
-        existing_active = Rental_Agreements[Customer == input.Customer && Rental_Item == input.Rental_Item && Agreement_Status == "Active" && ID != input.ID];
+        curr_id = input.ID;
+        existing_active = Rental_Agreements[Customer == target_cust_id && Rental_Item == target_item_id && Agreement_Status == "Active" && ID != curr_id];
         if(existing_active.count() > 0)
         {
             alert "Duplicate Daily Agreement Prevented:\n\nAnother active Daily agreement already exists for this Customer and Item:\n" + existing_active.Rental_Agreement_ID.getAll();
             cancel submit;
         }
     }
-}
-
-// 8. Safety fallback for Active Deployed Stations (Hidden on Add mode)
-if(input.Active_Deployed_Stations == null)
-{
-    input.Active_Deployed_Stations = 0;
 }

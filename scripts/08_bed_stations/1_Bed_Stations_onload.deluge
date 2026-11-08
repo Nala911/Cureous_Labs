@@ -1,90 +1,99 @@
-/* ==============================================================================
-   Module Name  : Bed Stations (Form Link Name: Bed_Stations)
-   Script Type  : Form Workflow (On Load)
-   Trigger Hook : Created or Edited -> Form Actions -> On Load
-   File Path    : scripts/08_bed_stations/1_Bed_Stations_onload.deluge
-   Fields Used  : [Rental_Agreement, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Customer, Product_Model, Bed_Station_ID, Deployment_End_Date]
-   Cross-Forms  : None
-   Purpose      : Intelligent Form UX: In Add mode, enables user entry fields
-                  (Rental Agreement, Bed Label, Bed Station Title, Control Unit,
-                  Overlay Asset, Deployment Start Date, Deployment Status). Disables
-                  context fields (Customer, Product Model, Bed Station ID,
-                  Deployment End Date). Auto-fills Deployment Start Date with current
-                  timestamp (editable) and defaults status to Active.
-                  In Edit mode, locks hardware assets and contract anchors.
-   Optimization : Zero database queries consumed.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/08_bed_stations/1_Bed_Stations_onload.deluge
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Rental_Item, Deployment_End_Date]
+// Cross-Forms  : None
+// Purpose      : Configures dynamic UI visibility and field states based on Add vs Edit
+//                mode. In Add mode, defaults Deployment_Type to "Rental", enables
+//                interactive fields, disables context fields, and defaults start date
+//                and status. In Edit mode, locks contract, customer, mode, and hardware
+//                lookups to protect bedside custody integrity.
+// Optimization : Zero database queries consumed. Runs in <5ms.
+// ==============================================================================
 
 if(input.ID == null)
 {
-    // 1. ADD Mode: User Entry Fields (Enabled & Visible)
+    // 1. ADD Mode: Configure Initial Field States
+    
+    // Deployment Type: Enabled and defaulted to Rental
+    input.Deployment_Type = "Rental";
+    enable Deployment_Type;
+    show Deployment_Type;
+    
+    // Rental Agreement: Enabled and visible by default for Rental mode
     enable Rental_Agreement;
     show Rental_Agreement;
     
+    // Customer: Shown but disabled by default (auto-filled from Rental Agreement)
+    disable Customer;
+    show Customer;
+    
+    // Operational bed label and title
     enable Bed_Label;
     show Bed_Label;
     
-    // Auto-filled when Rental Agreement and Bed Label are entered; user is allowed to edit
     enable Bed_Station_Title;
     show Bed_Station_Title;
     
-    enable Control_Unit;
+    // Hardware lookups: Disabled initially until Customer or Rental Agreement is chosen
+    disable Control_Unit;
     show Control_Unit;
     
-    enable Overlay_Asset;
+    disable Overlay_Asset;
     show Overlay_Asset;
     
-    // Auto-filled with current timestamp; user is allowed to edit
+    // Deployment Start Date: Defaults to current timestamp (editable)
     input.Deployment_Start_Date = zoho.currenttime;
     enable Deployment_Start_Date;
     show Deployment_Start_Date;
     
-    // Default deployment status to Active
+    // Deployment Status: Defaults to Active
     input.Deployment_Status = "Active";
     enable Deployment_Status;
     show Deployment_Status;
     
-    // 2. Disabled Context Fields: Auto-filled by Deluge to provide context without user editing
-    disable Customer;
-    show Customer;
-    
-    disable Product_Model;
-    show Product_Model;
-    
-    disable Bed_Station_ID;
-    show Bed_Station_ID;
+    // Derived Context Fields: Disabled on Add
+    disable Rental_Item;
+    show Rental_Item;
     
     disable Deployment_End_Date;
     show Deployment_End_Date;
     input.Deployment_End_Date = null;
     
-    // 3. Auto-generate sequential Bed Station ID preview
-    current_year = zoho.currentdate.getYear();
-    bst_count = Bed_Stations[ID != null].count() + 1;
-    formatted_seq = bst_count.toString().leftPad(4).replaceAll(" ", "0");
-    input.Bed_Station_ID = "BST-" + current_year + "-" + formatted_seq;
+    // Note: Bed_Station_ID is an Auto-Number field managed natively by Zoho Creator
 }
 else
 {
-    // 4. EDIT Mode: Protect hardware pairing and contract integrity
-    disable Bed_Station_ID;
+    // 2. EDIT Mode: Lock Contract, Customer, Hardware Pairings, and Context Fields
+    disable Deployment_Type;
     disable Rental_Agreement;
     disable Customer;
-    disable Product_Model;
+    disable Rental_Item;
     disable Control_Unit;
     disable Overlay_Asset;
     disable Deployment_End_Date;
     
-    // Operational parameters can be updated
+    // Conditional display of Rental Agreement in Edit mode based on Deployment Type
+    if(input.Deployment_Type == "For Trial")
+    {
+        hide Rental_Agreement;
+    }
+    else
+    {
+        show Rental_Agreement;
+    }
+    
+    // Allow operational updates to label, title, status, and start date
     enable Bed_Label;
     enable Bed_Station_Title;
     enable Deployment_Status;
     enable Deployment_Start_Date;
     
-    show Bed_Station_ID;
-    show Rental_Agreement;
+    show Deployment_Type;
     show Customer;
-    show Product_Model;
+    show Rental_Item;
     show Control_Unit;
     show Overlay_Asset;
     show Bed_Label;

@@ -1,0 +1,14 @@
+// ==============================================================================
+// Module Name  : Rental Items (Form Link Name: Rental_Items)
+// Script Type  : Form Workflow
+// Trigger Hook : Created -> Form Actions -> On Success
+// File Path    : scripts/04_rental_items/4_Rental_Items_onsuccess.deluge
+// Fields Used  : None
+// Cross-Forms  : None
+// Purpose      : Navigates cleanly to the 'All_Rental_Items' report upon successful
+//                save, terminating the submit loading spinner immediately.
+// Optimization : 0 database queries consumed.
+// ==============================================================================
+
+// Redirect cleanly to the All_Rental_Items report (instantly dismisses submit loader)
+openUrl("#Report:All_Rental_Items", "same window");

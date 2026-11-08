@@ -1,0 +1,127 @@
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Rental_Agreement -> On User Input
+// File Path    : scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge
+// Fields Used  : [Rental_Agreement, Customer, Rental_Item, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset]
+// Cross-Forms  : [Rental_Agreements, Customers, Rental_Items, Devices, Bed_Stations]
+// Purpose      : When a Rental Agreement is selected:
+//                1. Auto-populates Customer and Rental Item from agreement.
+//                2. Re-composes Bed Station Title.
+//                3. Dynamically queries Devices currently located at that customer's
+//                   site (Current_Customer == Customer) and filters Control Unit
+//                   and Overlay dropdowns accordingly.
+//                4. Validates Fixed Monthly 1-to-1 agreement limits with a notice.
+// Optimization : Max 1 indexed query per related form. Clean procedural Deluge.
+// ==============================================================================
+
+if(input.Rental_Agreement != null)
+{
+    agr_id = input.Rental_Agreement;
+    agr_rec = Rental_Agreements[ID == agr_id];
+    
+    if(agr_rec.count() > 0)
+    {
+        // 1. Auto-populate Customer lookup
+        input.Customer = agr_rec.Customer;
+        
+        // 2. Resolve Customer Name for Title composition
+        cust_name = "";
+        if(agr_rec.Customer != null)
+        {
+            cust_id = agr_rec.Customer;
+            cust_rec = Customers[ID == cust_id];
+            if(cust_rec.count() > 0)
+            {
+                cust_name = ifnull(cust_rec.Customer_Name, "");
+            }
+        }
+        
+        // 3. Auto-populate Rental Item from Agreement / Rental Items
+        if(agr_rec.Rental_Item != null)
+        {
+            item_id = agr_rec.Rental_Item;
+            item_rec = Rental_Items[ID == item_id];
+            if(item_rec.count() > 0)
+            {
+                input.Rental_Item = ifnull(item_rec.Item_Name, "");
+            }
+        }
+        
+        // 4. Auto-compose Bed Station Title
+        if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+        {
+            if(cust_name != "")
+            {
+                input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim();
+            }
+            else
+            {
+                input.Bed_Station_Title = input.Bed_Label.trim();
+            }
+        }
+        else if(cust_name != "")
+        {
+            input.Bed_Station_Title = cust_name;
+        }
+        
+        // 5. Dynamic Customer Hardware Retrieval
+        // Query devices physically present at this customer's facility
+        if(input.Customer != null)
+        {
+            c_target = input.Customer;
+            cu_devices = Devices[Current_Customer == c_target && Device_Type == "Control Unit"].ID.getAll();
+            ov_devices = Devices[Current_Customer == c_target && Device_Type == "Overlay"].ID.getAll();
+            
+            // Clear prior hardware selections
+            input.Control_Unit = null;
+            input.Overlay_Asset = null;
+            
+            // Populate lookup choices dynamically with customer-site devices
+            input.Control_Unit:ui.add(cu_devices);
+            input.Overlay_Asset:ui.add(ov_devices);
+            
+            // Enable hardware selection lookups
+            enable Control_Unit;
+            enable Overlay_Asset;
+            
+            // Provide helpful feedback if customer site lacks available inventory
+            if(cu_devices.size() == 0 || ov_devices.size() == 0)
+            {
+                alert "Inventory Notice:\n\nCustomer '" + cust_name + "' currently has " + cu_devices.size() + " Control Unit(s) and " + ov_devices.size() + " Overlay(s) at their site.\n\nPlease verify that a Stock Transfer ('Office to Customer') has been completed to deliver devices to this customer.";
+            }
+        }
+        
+        // 6. Fixed Monthly Agreement Active Station Check (Advisory Notice)
+        if(agr_rec.Billing_Unit == "Month")
+        {
+            curr_id = input.ID;
+            existing_active = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == "Active" && ID != curr_id];
+            if(existing_active.count() > 0)
+            {
+                alert "Contract Constraint Notice:\n\nThis Fixed Monthly Rental agreement already has an active Bed Station deployed:\n" + existing_active.Bed_Station_ID.getAll() + " (" + existing_active.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. Validation will prevent submission until the existing station is closed.";
+            }
+        }
+    }
+}
+else
+{
+    // Selection cleared: Reset auto-derived fields and hardware lookups
+    input.Customer = null;
+    input.Rental_Item = "";
+    input.Control_Unit = null;
+    input.Overlay_Asset = null;
+    input.Control_Unit:ui.add(list());
+    input.Overlay_Asset:ui.add(list());
+    disable Control_Unit;
+    disable Overlay_Asset;
+    
+    if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+    {
+        input.Bed_Station_Title = input.Bed_Label.trim();
+    }
+    else
+    {
+        input.Bed_Station_Title = "";
+    }
+}

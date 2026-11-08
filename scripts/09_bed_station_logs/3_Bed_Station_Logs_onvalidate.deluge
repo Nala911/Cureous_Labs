@@ -8,18 +8,44 @@
    Purpose      : Enforces strict data integrity and prevents direct manual submissions.
                   Validates that required hardware references are present when inserted
                   by system automations.
-   Optimization : Lightweight validation guard.
+   Optimization : Lightweight validation guard. Antigravity error tracing.
 ============================================================================== */
 
-// 1. Validate mandatory relational fields for system-generated records
-if(input.Bed_Station == null)
-{
-    alert("System Error: Bed Station lookup cannot be empty.");
-    cancel submit;
-}
+current_step = "1. Parse & initialize input context";
+debug_ctx = Map();
+debug_ctx.put("Record_ID", ifnull(input.ID, "New_Record"));
+debug_ctx.put("Bed_Station", input.Bed_Station);
+debug_ctx.put("Control_Unit", input.Control_Unit);
+debug_ctx.put("Overlay", input.Overlay);
 
-// 2. Default timestamps if omitted by caller
-if(input.Period_Start_Date == null)
+try 
 {
-    input.Period_Start_Date = zoho.currenttime;
+    // 1. Validate mandatory relational fields for system-generated records
+    current_step = "1. Validate mandatory relational fields";
+    if(input.Bed_Station == null)
+    {
+        alert "System Error: Bed Station lookup cannot be empty.";
+        cancel submit;
+    }
+
+    // 2. Default timestamps if omitted by caller
+    current_step = "2. Default timestamps";
+    if(input.Period_Start_Date == null)
+    {
+        input.Period_Start_Date = zoho.currenttime;
+    }
+}
+catch (e)
+{
+    err_payload = "=================== 🚨 ANTIGRAVITY ERROR REPORT ===================\n" +
+                  "File    : scripts/09_bed_station_logs/3_Bed_Station_Logs_onvalidate.deluge\n" +
+                  "Step    : " + current_step + "\n" +
+                  "Record  : " + ifnull(input.ID, "New_Record").toString() + "\n" +
+                  "Error   : " + e.toString() + "\n" +
+                  "Context : " + debug_ctx.toString() + "\n" +
+                  "==================================================================";
+    
+    info err_payload;
+    alert err_payload;
+    cancel submit;
 }

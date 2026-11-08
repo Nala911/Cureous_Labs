@@ -1,20 +1,22 @@
-/* ==============================================================================
-   Module Name  : Product Catalog (Form Link Name: Product_Catalog)
-   Script Type  : Form Workflow (On Load)
-   Trigger Hook : Created or Edited -> Form Actions -> On Load
-   File Path    : scripts/04_product_catalog/1_Product_Catalog_onload.deluge
-   Purpose      : Locks derived fields. In Edit mode, prevents altering existing
-                  products. In Add mode, fetches active rental service items from
-                  Zoho Books and populates the Item Name dropdown dynamically.
-   Optimization : Native Zoho Books integration call. Filters out existing records.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Rental Items (Form Link Name: Rental_Items)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/04_rental_items/1_Rental_Items_onload.deluge
+// Fields Used  : [Item_ID, Product_Model, Billing_Unit, Item_Name]
+// Cross-Forms  : [Rental_Items]
+// Purpose      : Locks auto-derived fields. In Edit mode, prevents altering existing
+//                items. In Add mode, fetches active rental service items from
+//                Zoho Books and populates the Item Name dropdown dynamically.
+// Optimization : Native Zoho Books integration call. Filters out existing records.
+// ==============================================================================
 
 // 1. Lock all auto-derived fields
 disable Item_ID;
 disable Product_Model;
 disable Billing_Unit;
 
-// 2. Edit Mode Protection: Disallow altering existing product record
+// 2. Edit Mode Protection: Disallow altering existing item record
 if(input.ID != null)
 {
     disable Item_Name;
@@ -46,9 +48,9 @@ else
             books_items = books_resp.get("items");
             
             // Collect items already onboarded in Creator to avoid duplicates
-            existing_items = Product_Catalog[ID != null].Item_Name.getAll();
+            existing_items = Rental_Items[ID != null].Item_Name.getAll();
             
-            item_names = List();
+            item_names = list();
             for each itm in books_items
             {
                 itm_name = itm.get("name");

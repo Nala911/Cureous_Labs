@@ -1,12 +1,15 @@
-/* ==============================================================================
-   Module Name  : Product Catalog (Form Link Name: Product_Catalog)
-   Script Type  : Form Workflow (On Validate)
-   Trigger Hook : Created or Edited -> Form Actions -> On Validate
-   File Path    : scripts/04_product_catalog/3_Product_Catalog_onvalidate.deluge
-   Purpose      : Validates mandatory selection and ID linkage, and prevents
-                  duplicate registration with a friendly user alert.
-   Optimization : Max 1 indexed query for duplicate check. Runs in <10ms.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Rental Items (Form Link Name: Rental_Items)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/04_rental_items/3_Rental_Items_onvalidate.deluge
+// Fields Used  : [Item_Name, Item_ID, Billing_Unit, Product_Model]
+// Cross-Forms  : [Rental_Items]
+// Purpose      : Validates mandatory selection and Zoho Books Item ID linkage,
+//                prevents duplicate registration, and ensures safety fallback
+//                for derived fields.
+// Optimization : Max 1 indexed query for duplicate check. Zero try-catch blocks.
+// ==============================================================================
 
 // 1. Mandatory Field Checks
 if(input.Item_Name == null || input.Item_Name.trim() == "")
@@ -21,22 +24,27 @@ if(input.Item_ID == null || input.Item_ID.trim() == "")
     cancel submit;
 }
 
-// 2. Friendly Duplicate Guard
+// 2. Duplicate Guard
 if(input.ID == null)
 {
-    existing_items = Product_Catalog[Item_ID == input.Item_ID || Item_Name == input.Item_Name];
+    target_item_id = input.Item_ID;
+    target_name = input.Item_Name;
+    existing_items = Rental_Items[Item_ID == target_item_id || Item_Name == target_name];
     if(existing_items.count() > 0)
     {
-        alert "Item Already Onboarded:\n\n'" + input.Item_Name + "' is already registered in Cureous PRS with Item ID " + input.Item_ID + ".\n\nDuplicate registration is prevented. You can view or use this product from the 'All Product Catalogs' report.";
+        alert "Item Already Onboarded:\n\n'" + input.Item_Name + "' is already registered in Cureous PRS with Item ID " + input.Item_ID + ".\n\nDuplicate registration is prevented. You can view or use this rental item from the 'All Rental Items' report.";
         cancel submit;
     }
 }
 else
 {
-    existing_items = Product_Catalog[(Item_ID == input.Item_ID || Item_Name == input.Item_Name) && ID != input.ID];
+    target_item_id = input.Item_ID;
+    target_name = input.Item_Name;
+    curr_id = input.ID;
+    existing_items = Rental_Items[(Item_ID == target_item_id || Item_Name == target_name) && ID != curr_id];
     if(existing_items.count() > 0)
     {
-        alert "Item Already Onboarded:\n\nAnother item with Name '" + input.Item_Name + "' or ID " + input.Item_ID + " already exists.";
+        alert "Item Already Onboarded:\n\nAnother rental item with Name '" + input.Item_Name + "' or ID " + input.Item_ID + " already exists.";
         cancel submit;
     }
 }
@@ -44,7 +52,7 @@ else
 // 3. Safety Fallback for Derived Fields
 name_lower = input.Item_Name.toLowerCase();
 
-if(input.Billing_Unit == null || input.Billing_Unit.trim() == "")
+if(input.Billing_Unit == null || input.Billing_Unit == "")
 {
     if(name_lower.contains("monthly"))
     {

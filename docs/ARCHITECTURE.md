@@ -42,7 +42,7 @@ A clinically functioning system consists of **TWO independent physical component
 
 ## 3. Product Tiers
 
-Configured dynamically by administrators in `Product_Catalog`:
+Configured dynamically by administrators in `Rental_Items`:
 - **Altern4™**: Standard alternating pressure 4-inch system (basic institutional tier).
 - **Eturnal One™**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
 - **Eturnal One with Foam**: Premium tier featuring a safety foam underlay base to prevent patient bottoming-out during sudden power cuts.
@@ -69,10 +69,10 @@ The architecture maintains clean boundaries between Zoho Creator (operational ha
 2. **Branch Offices & Locations (Rule 55 CGST Delivery Challans)**:
    - Creator `Locations` directly maps to the company's 3 GST-registered physical branch offices (Bangalore HQ, Kerala Office / Palakkad, and Nagpur Office).
    - Zero virtual warehouses: Delivery Challans and E-Way bills generated through Books API use the branch's registered `location_id`, with statutory GSTINs and branch addresses handled natively in Zoho Books.
-3. **Product Catalog Sync**:
+3. **Rental Items Sync**:
    - Creator rental items map 1:1 with Zoho Books rental service items, using `Books_Item_ID` as the billing line-item identifier.
 4. **Automated Books Invoice Push**:
-   - Accounts can push single or consolidated draft invoices directly from `Rental_Log` into Zoho Books.
+   - Accounts can push single or consolidated draft invoices directly from `Rental_Logs` into Zoho Books.
    - Invoices include detailed line descriptions with Bed Station labels, serial numbers, and exact calendar dates.
 
 ---

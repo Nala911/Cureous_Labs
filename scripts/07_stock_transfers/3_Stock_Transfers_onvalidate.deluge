@@ -1,15 +1,15 @@
-/* ==============================================================================
-   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
-   Script Type  : Form Workflow (On Validate)
-   Trigger Hook : Created or Edited -> Form Actions -> On Validate
-   File Path    : scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge
-   Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Control_Unit_Number, Overlay_Number, Transfer_Status]
-   Cross-Forms  : None
-   Purpose      : Validates mandatory transfer routing, prevents transferring to the
-                  same branch, ensures Transfer Status is valid, and enforces that
-                  at least one device is selected.
-   Optimization : Zero database queries consumed. Runs in <10ms.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+// Script Type  : Form Workflow (On Validate)
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge
+// Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Select_Devices, Transfer_Status]
+// Cross-Forms  : None
+// Purpose      : Validates mandatory transfer routing, prevents transferring to the
+//                same branch, ensures Transfer Status is valid, and enforces that
+//                at least one device is selected from Select_Devices.
+// Optimization : Zero database queries consumed. Runs in <10ms.
+// ==============================================================================
 
 // 1. Mandatory Transfer Type Check
 if(input.Transfer_Type == null || input.Transfer_Type == "")
@@ -65,10 +65,9 @@ else if(input.Transfer_Type == "Customer to Office")
 }
 
 // 3. Mandatory Hardware Selection Check
-total_devices = ifnull(input.Control_Unit_Number, 0) + ifnull(input.Overlay_Number, 0);
-if(total_devices == 0)
+if(input.Select_Devices == null || input.Select_Devices.size() == 0)
 {
-    alert "Inventory Validation Error:\n\nPlease select at least one Control Unit or Overlay to initiate this transfer.";
+    alert "Inventory Validation Error:\n\nPlease select at least one device to initiate this transfer.";
     cancel submit;
 }
 

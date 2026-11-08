@@ -19,7 +19,7 @@
 2. **Agreement Title** `[Single Line - Read Only]`
 3. **Customer** `[Single Line - Read Only]`
 4. **Deployed Bed Station** `[Single Line - Read Only]` (Displays assigned `Bed_Station_Title`)
-5. **Product Model** `[Single Line - Read Only]`
+5. **Rental Item** `[Single Line - Read Only]`
 6. **Active CU Serial** `[Single Line - Read Only]`
 7. **Active Mattress Serial** `[Single Line - Read Only]`
 8. **Agreed Monthly Rate (₹)** `[Currency - Read Only]`
@@ -72,7 +72,7 @@ void fn_generate_fixed_monthly_rental_log(int agreementId, date startDate, date 
         Customer = agrRec.Customer,
         Rental_Agreement = agrRec.ID,
         Rental_Item = agrRec.Rental_Item,
-        Product_Model = agrRec.Product_Model,
+        Rental_Item = agrRec.Rental_Item,
         Rental_Mode = "Fixed Monthly Rental",
         Control_Unit_Serial_No = stationRec.Control_Unit_Serial_No,
         Overlay_Serial_No = stationRec.Overlay_Serial_No,

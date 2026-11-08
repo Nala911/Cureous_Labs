@@ -1,0 +1,69 @@
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Deployment_Type -> On User Input
+// File Path    : scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Control_Unit, Overlay_Asset, Rental_Item, Bed_Label, Bed_Station_Title]
+// Cross-Forms  : None
+// Purpose      : Dynamically adjusts form fields when user switches between "Rental"
+//                and "For Trial". For Rental, activates Rental Agreement lookup and
+//                disables Customer (auto-filled). For Trial, hides Rental Agreement
+//                and enables direct Customer selection. Clears dependent hardware
+//                and resets device lookup choices.
+// Optimization : Zero database queries. Runs in <5ms.
+// ==============================================================================
+
+if(input.Deployment_Type == "Rental")
+{
+    // 1. Rental Mode: Activate Rental Agreement and Lock Customer (Derived)
+    show Rental_Agreement;
+    enable Rental_Agreement;
+    input.Rental_Agreement = null;
+    
+    show Customer;
+    disable Customer;
+    input.Customer = null;
+    
+    // Clear rental item
+    input.Rental_Item = "";
+    
+    // Reset and disable hardware lookups until an agreement is selected
+    input.Control_Unit = null;
+    input.Overlay_Asset = null;
+    input.Control_Unit:ui.add(list());
+    input.Overlay_Asset:ui.add(list());
+    disable Control_Unit;
+    disable Overlay_Asset;
+}
+else if(input.Deployment_Type == "For Trial")
+{
+    // 2. Trial Mode: Hide Rental Agreement and Enable Direct Customer Selection
+    hide Rental_Agreement;
+    disable Rental_Agreement;
+    input.Rental_Agreement = null;
+    
+    show Customer;
+    enable Customer;
+    input.Customer = null;
+    
+    // Clear rental item
+    input.Rental_Item = "";
+    
+    // Reset and disable hardware lookups until a customer is selected
+    input.Control_Unit = null;
+    input.Overlay_Asset = null;
+    input.Control_Unit:ui.add(list());
+    input.Overlay_Asset:ui.add(list());
+    disable Control_Unit;
+    disable Overlay_Asset;
+}
+
+// 3. Re-evaluate Bed Station Title
+if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+{
+    input.Bed_Station_Title = input.Bed_Label.trim();
+}
+else
+{
+    input.Bed_Station_Title = "";
+}

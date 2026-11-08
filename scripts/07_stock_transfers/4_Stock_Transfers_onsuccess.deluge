@@ -1,161 +1,130 @@
-/* ==============================================================================
-   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
-   Script Type  : Form Workflow (On Success)
-   Trigger Hook : Created or Edited -> Form Actions -> On Success
-   File Path    : scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge
-   Fields Used  : [Select_Control_Unit, Select_Overlay, Transfer_Status, Transfer_Type, Destination_Office, Destination_Customer]
-   Cross-Forms  : [Stock_Transfer_Items, Devices]
-   Purpose      : Automatically creates itemized child audit records in Stock_Transfer_Items
-                  for each selected Control Unit and Overlay (on Add), and synchronizes the
-                  physical hardware ledger (Current_Custody, Current_Location, Current_Customer,
-                  and Rental_State) in Devices across all transfer stages (Dispatched,
-                  In-Transit, Delivered).
-   Optimization : Atomic batch lookups and insertion safety guard preventing duplicate line
-                  items on subsequent edit submissions. Relies on native Zoho Creator submission.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Created or Edited -> Form Actions -> On Success
+// File Path    : scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge
+// Fields Used  : [Select_Devices, Transfer_Status, Transfer_Type, Destination_Office, Destination_Customer]
+// Cross-Forms  : [Stock_Transfer_Items, Devices]
+// Purpose      : Automatically creates itemized child audit records in Stock_Transfer_Items
+//                for each selected device in Select_Devices, and synchronizes the
+//                physical hardware ledger in Devices across all transfer stages.
+// ==============================================================================
 
-// 1. Gather all selected hardware identifiers (Serial Numbers or IDs)
-all_device_identifiers = List();
-
-if(input.Select_Control_Unit != null)
+// 1. Synchronize Selected Devices in Devices Master & Create Audit Line Items
+if(input.Select_Devices != null)
 {
-    for each cu_item in input.Select_Control_Unit
+    for each dev_serial in input.Select_Devices
     {
-        if(cu_item != null && cu_item.toString().trim() != "")
-        {
-            all_device_identifiers.add(cu_item.toString().trim());
-        }
-    }
-}
-
-if(input.Select_Overlay != null)
-{
-    for each ov_item in input.Select_Overlay
-    {
-        if(ov_item != null && ov_item.toString().trim() != "")
-        {
-            all_device_identifiers.add(ov_item.toString().trim());
-        }
-    }
-}
-
-// Fallback for Edit Mode: If multi-select lookups are empty, load devices from existing audit line items
-if(all_device_identifiers.size() == 0)
-{
-    existing_items = Stock_Transfer_Items[Stock_Transfer_Ref == input.ID];
-    for each item in existing_items
-    {
-        if(item.Device_Ref != null)
-        {
-            all_device_identifiers.add(item.Device_Ref.toString());
-        }
-    }
-}
-
-// 2. Check if child line items already exist to prevent duplicate insertions on Edit mode
-existing_line_items_count = Stock_Transfer_Items[Stock_Transfer_Ref == input.ID].count();
-
-// 3. Process Line Items & Update Device Custody
-if(all_device_identifiers.size() > 0)
-{
-    for each dev_ref in all_device_identifiers
-    {
-        // Search device primarily by Serial Number
-        dev = Devices[Serial_Number == dev_ref];
-        
-        // Fallback: If not found by Serial Number, check if dev_ref is a numeric Record ID
-        if(dev.count() == 0 && dev_ref.isNumber())
-        {
-            dev = Devices[ID == dev_ref.toLong()];
-        }
-        
-        // Safety Guard: Only access fields if at least one matching device record was found
-        if(dev.count() > 0)
+        dev = Devices[Serial_Number == dev_serial];
+        if(dev != null)
         {
             d_id = dev.ID;
+            t_id = input.ID;
             d_type = dev.Device_Type;
             d_model = dev.Device_Model;
             
-            // Insert audit line item into Stock_Transfer_Items only if not already created
-            if(existing_line_items_count == 0)
+            // Check if child audit line item already exists for this transfer
+            existing_item = Stock_Transfer_Items[Stock_Transfer_Ref == t_id && Device_Ref == d_id];
+            if(existing_item == null || existing_item.ID == null)
             {
                 insert into Stock_Transfer_Items
                 [
-                    Stock_Transfer_Ref = input.ID
+                    Stock_Transfer_Ref = t_id
                     Device_Ref = d_id
                     Device_Type = d_type
                     Device_Model = d_model
-                ];
+                ]
             }
             
-            // State Machine Engine: Physical Hardware Ledger Transitions
-            // Uses explicit atomic 'update Devices' DML task to guarantee immediate database persistence
+            // Update Physical Hardware Ledger in Devices
             if(input.Transfer_Status == "Dispatched")
             {
-                update Devices
-                [
-                    ID == d_id
-                ]
-                [
-                    Current_Custody = "Dispatched",
-                    Current_Location = null,
-                    Current_Customer = null,
-                    Rental_State = "Inactive"
-                ];
+                dev.Current_Custody = "Dispatched";
+                dev.Current_Location = null;
+                dev.Current_Customer = null;
+                dev.Rental_State = "Inactive";
             }
             else if(input.Transfer_Status == "In-Transit")
             {
-                update Devices
-                [
-                    ID == d_id
-                ]
-                [
-                    Current_Custody = "In-Transit",
-                    Current_Location = null,
-                    Current_Customer = null,
-                    Rental_State = "Inactive"
-                ];
+                dev.Current_Custody = "In-Transit";
+                dev.Current_Location = null;
+                dev.Current_Customer = null;
+                dev.Rental_State = "Inactive";
             }
             else if(input.Transfer_Status == "Delivered")
             {
                 if(input.Transfer_Type == "Inter Branch")
                 {
-                    update Devices
-                    [
-                        ID == d_id
-                    ]
-                    [
-                        Current_Location = input.Destination_Office,
-                        Current_Customer = null,
-                        Current_Custody = "Internal Office",
-                        Rental_State = "Inactive"
-                    ];
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
                 }
                 else if(input.Transfer_Type == "Office to Customer")
                 {
-                    update Devices
-                    [
-                        ID == d_id
-                    ]
-                    [
-                        Current_Customer = input.Destination_Customer,
-                        Current_Location = null,
-                        Current_Custody = "Customer's Site",
-                        Rental_State = "Inactive"
-                    ];
+                    dev.Current_Customer = input.Destination_Customer;
+                    dev.Current_Location = null;
+                    dev.Current_Custody = "Customer's Site";
+                    dev.Rental_State = "Inactive";
                 }
                 else if(input.Transfer_Type == "Customer to Office")
                 {
-                    update Devices
-                    [
-                        ID == d_id
-                    ]
-                    [
-                        Current_Location = input.Destination_Office,
-                        Current_Customer = null,
-                        Current_Custody = "Internal Office",
-                        Rental_State = "Inactive"
-                    ];
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
+                }
+            }
+        }
+    }
+}
+else
+{
+    // Fallback for Edit Mode status updates if Select_Devices is not accessible
+    t_id = input.ID;
+    existing_items = Stock_Transfer_Items[Stock_Transfer_Ref == t_id];
+    for each item in existing_items
+    {
+        item_dev_id = item.Device_Ref;
+        dev = Devices[ID == item_dev_id];
+        if(dev != null)
+        {
+            if(input.Transfer_Status == "Dispatched")
+            {
+                dev.Current_Custody = "Dispatched";
+                dev.Current_Location = null;
+                dev.Current_Customer = null;
+                dev.Rental_State = "Inactive";
+            }
+            else if(input.Transfer_Status == "In-Transit")
+            {
+                dev.Current_Custody = "In-Transit";
+                dev.Current_Location = null;
+                dev.Current_Customer = null;
+                dev.Rental_State = "Inactive";
+            }
+            else if(input.Transfer_Status == "Delivered")
+            {
+                if(input.Transfer_Type == "Inter Branch")
+                {
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
+                }
+                else if(input.Transfer_Type == "Office to Customer")
+                {
+                    dev.Current_Customer = input.Destination_Customer;
+                    dev.Current_Location = null;
+                    dev.Current_Custody = "Customer's Site";
+                    dev.Rental_State = "Inactive";
+                }
+                else if(input.Transfer_Type == "Customer to Office")
+                {
+                    dev.Current_Location = input.Destination_Office;
+                    dev.Current_Customer = null;
+                    dev.Current_Custody = "Internal Office";
+                    dev.Rental_State = "Inactive";
                 }
             }
         }

@@ -1,22 +1,44 @@
-/* ==============================================================================
-   Module Name  : Bed Stations (Form Link Name: Bed_Stations)
-   Script Type  : Form Workflow (On Validate)
-   Trigger Hook : Created or Edited -> Form Actions -> On Validate
-   File Path    : scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge
-   Fields Used  : [Rental_Agreement, Bed_Label, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Bed_Station_ID, Bed_Station_Title, Customer, Product_Model, Deployment_End_Date]
-   Cross-Forms  : [Rental_Agreements, Devices, Customers]
-   Purpose      : Enforces mandatory bedside fields, validates hardware types (CU vs Overlay),
-                  guards against assigning an already-deployed active hardware asset,
-                  enforces strict 1-to-1 active station limit for Fixed Monthly Rental
-                  agreements, and guarantees closure timestamp and fallback defaults.
-   Optimization : Max 2 indexed queries. Runs in <15ms.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On Validate)
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Label, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Bed_Station_ID, Bed_Station_Title, Rental_Item, Deployment_End_Date]
+// Cross-Forms  : [Rental_Agreements, Devices, Customers, Bed_Stations]
+// Purpose      : Comprehensive clinical, commercial, and operational validation:
+//                1. Validates mandatory fields based on Deployment_Type.
+//                2. Verifies hardware classification (CU pump vs Overlay mattress).
+//                3. Ensures selected hardware is physically located at Customer's site.
+//                4. Blocks duplicate active hardware assignment across all bed stations.
+//                5. Enforces strict 1-to-1 active station limit for Fixed Monthly contracts.
+//                6. Guarantees title fallback and closure timestamp.
+// Optimization : Max 4 indexed queries. Zero try-catch blocks.
+// ==============================================================================
+
+curr_id = input.ID;
 
 // 1. Mandatory Field Validations
-if(input.Rental_Agreement == null)
+if(input.Deployment_Type == null || input.Deployment_Type == "")
 {
-    alert "Validation Error:\n\nPlease select a Rental Agreement.";
+    alert "Validation Error:\n\nPlease select a Deployment Type ('Rental' or 'For Trial').";
     cancel submit;
+}
+
+if(input.Deployment_Type == "Rental")
+{
+    if(input.Rental_Agreement == null)
+    {
+        alert "Validation Error:\n\nPlease select a Rental Agreement for this commercial Rental deployment.";
+        cancel submit;
+    }
+}
+else if(input.Deployment_Type == "For Trial")
+{
+    if(input.Customer == null)
+    {
+        alert "Validation Error:\n\nPlease select a Customer for this Trial evaluation deployment.";
+        cancel submit;
+    }
 }
 
 if(input.Bed_Label == null || input.Bed_Label.trim() == "")
@@ -50,25 +72,45 @@ if(input.Deployment_Status == null || input.Deployment_Status == "")
 }
 
 // 2. Hardware Classification & Type Validation
-cu_rec = Devices[ID == input.Control_Unit];
+cu_id = input.Control_Unit;
+cu_rec = Devices[ID == cu_id];
 if(cu_rec.count() == 0 || cu_rec.Device_Type != "Control Unit")
 {
     alert "Hardware Type Mismatch:\n\nThe asset selected under 'Control Unit' is not classified as a Control Unit in the Device Master.";
     cancel submit;
 }
 
-ov_rec = Devices[ID == input.Overlay_Asset];
+ov_id = input.Overlay_Asset;
+ov_rec = Devices[ID == ov_id];
 if(ov_rec.count() == 0 || ov_rec.Device_Type != "Overlay")
 {
     alert "Hardware Type Mismatch:\n\nThe asset selected under 'Overlay Asset' is not classified as an Overlay mattress in the Device Master.";
     cancel submit;
 }
 
-// 3. Active Deployment Hardware Conflict Guard
+// 3. Customer Site Custody Guard
+// Ensure both selected assets physically reside at the assigned customer's facility
+if(input.Customer != null)
+{
+    target_cust = input.Customer;
+    if(cu_rec.Current_Customer != target_cust)
+    {
+        alert "Hardware Custody Mismatch:\n\nControl Unit '" + cu_rec.Serial_Number + "' is not currently registered at this Customer's site in the Device Master.\n\nPlease select a Control Unit delivered to this customer.";
+        cancel submit;
+    }
+    
+    if(ov_rec.Current_Customer != target_cust)
+    {
+        alert "Hardware Custody Mismatch:\n\nOverlay Asset '" + ov_rec.Serial_Number + "' is not currently registered at this Customer's site in the Device Master.\n\nPlease select an Overlay mattress delivered to this customer.";
+        cancel submit;
+    }
+}
+
+// 4. Active Deployment Hardware Conflict Guard
 if(input.Deployment_Status == "Active")
 {
     // Check if Control Unit is already deployed on another active bed station
-    existing_cu = Bed_Stations[Control_Unit == input.Control_Unit && Deployment_Status == "Active" && ID != input.ID];
+    existing_cu = Bed_Stations[Control_Unit == cu_id && Deployment_Status == "Active" && ID != curr_id];
     if(existing_cu.count() > 0)
     {
         alert "Hardware Conflict:\n\nControl Unit '" + cu_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_cu.Bed_Station_ID.getAll() + " (" + existing_cu.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Control Unit.";
@@ -76,7 +118,7 @@ if(input.Deployment_Status == "Active")
     }
     
     // Check if Overlay is already deployed on another active bed station
-    existing_ov = Bed_Stations[Overlay_Asset == input.Overlay_Asset && Deployment_Status == "Active" && ID != input.ID];
+    existing_ov = Bed_Stations[Overlay_Asset == ov_id && Deployment_Status == "Active" && ID != curr_id];
     if(existing_ov.count() > 0)
     {
         alert "Hardware Conflict:\n\nOverlay Asset '" + ov_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_ov.Bed_Station_ID.getAll() + " (" + existing_ov.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Overlay.";
@@ -84,45 +126,52 @@ if(input.Deployment_Status == "Active")
     }
 }
 
-// 4. Fixed Monthly Rental Agreement 1-to-1 Enforcement
-agr = Rental_Agreements[ID == input.Rental_Agreement];
-if(agr.count() > 0 && agr.Billing_Unit == "Month" && input.Deployment_Status == "Active")
+// 5. Fixed Monthly Rental Agreement 1-to-1 Enforcement
+if(input.Deployment_Type == "Rental" && input.Rental_Agreement != null && input.Deployment_Status == "Active")
 {
-    active_monthly = Bed_Stations[Rental_Agreement == input.Rental_Agreement && Deployment_Status == "Active" && ID != input.ID];
-    if(active_monthly.count() > 0)
+    agr_id = input.Rental_Agreement;
+    agr = Rental_Agreements[ID == agr_id];
+    if(agr.count() > 0 && agr.Billing_Unit == "Month")
     {
-        alert "Commercial Agreement Constraint:\n\nThis Fixed Monthly Rental agreement ('" + agr.Agreement_Title + "') already has an active Bed Station deployed:\n" + active_monthly.Bed_Station_ID.getAll() + " (" + active_monthly.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. To add more beds, please create a separate agreement or use a Daily (Pay-Per-Use) agreement.";
-        cancel submit;
+        active_monthly = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == "Active" && ID != curr_id];
+        if(active_monthly.count() > 0)
+        {
+            alert "Commercial Agreement Constraint:\n\nThis Fixed Monthly Rental agreement ('" + agr.Agreement_Title + "') already has an active Bed Station deployed:\n" + active_monthly.Bed_Station_ID.getAll() + " (" + active_monthly.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. To add more beds, please create a separate agreement or use a Daily (Pay-Per-Use) agreement.";
+            cancel submit;
+        }
     }
 }
 
-// 5. Safety Fallbacks for ID, Title, and Closure Timestamp
-if(input.Bed_Station_ID == null || input.Bed_Station_ID.trim() == "")
-{
-    current_year = zoho.currentdate.getYear();
-    bst_count = Bed_Stations[ID != null].count() + 1;
-    formatted_seq = bst_count.toString().leftPad(4).replaceAll(" ", "0");
-    input.Bed_Station_ID = "BST-" + current_year + "-" + formatted_seq;
-}
-
+// 6. Fallback Default for Bed Station Title
 if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
 {
     cust_name = "";
     if(input.Customer != null)
     {
-        cust_rec = Customers[ID == input.Customer];
-        cust_name = ifnull(cust_rec.Customer_Name, "");
+        c_id = input.Customer;
+        cust_rec = Customers[ID == c_id];
+        if(cust_rec.count() > 0)
+        {
+            cust_name = ifnull(cust_rec.Customer_Name, "");
+        }
     }
+    id_suffix = "";
+    if(input.Bed_Station_ID != null)
+    {
+        id_suffix = " (" + input.Bed_Station_ID.toString() + ")";
+    }
+    
     if(cust_name != "")
     {
-        input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim() + " (" + input.Bed_Station_ID + ")";
+        input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim() + id_suffix;
     }
     else
     {
-        input.Bed_Station_Title = input.Bed_Label.trim() + " (" + input.Bed_Station_ID + ")";
+        input.Bed_Station_Title = input.Bed_Label.trim() + id_suffix;
     }
 }
 
+// 7. Ensure Closure Timestamp
 if(input.Deployment_Status == "Closed" && input.Deployment_End_Date == null)
 {
     input.Deployment_End_Date = zoho.currenttime;

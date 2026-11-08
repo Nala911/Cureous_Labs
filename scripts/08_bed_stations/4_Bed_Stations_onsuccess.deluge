@@ -1,22 +1,26 @@
-/* ==============================================================================
-   Module Name  : Bed Stations (Form Link Name: Bed_Stations)
-   Script Type  : Form Workflow (On Success)
-   Trigger Hook : Created or Edited -> Form Actions -> On Success
-   File Path    : scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge
-   Fields Used  : [Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date]
-   Cross-Forms  : [Devices, Rental_Agreements, Bed_Station_Logs]
-   Purpose      : Synchronizes hardware asset custody in Devices (marking assets as
-                  "Deployed - Active on Bed" and linking Customer), updates the live
-                  Active_Deployed_Stations counter on the parent Rental Agreement,
-                  maintains the active pairing interval in Bed_Station_Logs, and
-                  dismisses the submit loader by redirecting to All_Bed_Stations.
-   Optimization : Atomic updates with targeted criteria. Minimal statement footprint.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Created or Edited -> Form Actions -> On Success
+// File Path    : scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge
+// Fields Used  : [Deployment_Type, Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date, Bed_Station_ID, Bed_Station_Title]
+// Cross-Forms  : [Devices, Rental_Agreements, Bed_Station_Logs, Bed_Stations]
+// Purpose      : Executes synchronized downstream updates on form submission:
+//                1. Updates physical hardware custody and Rental State in Devices.
+//                2. Synchronizes active station count on Rental Agreement (if Rental).
+//                3. Records active pairing interval in Bed_Station_Logs (supports
+//                   both Rental and Trial deployments with null-safe contract link).
+//                4. Appends system-generated Bed_Station_ID to Bed_Station_Title.
+// Optimization : Atomic updates with targeted criteria. Clean procedural Deluge.
+// ==============================================================================
+
+current_station_id = input.ID;
 
 // 1. Synchronize Physical Hardware Custody in Devices Master
 if(input.Control_Unit != null)
 {
-    cu_dev = Devices[ID == input.Control_Unit];
+    cu_id = input.Control_Unit;
+    cu_dev = Devices[ID == cu_id];
     if(cu_dev.count() > 0)
     {
         if(input.Deployment_Status == "Active")
@@ -35,7 +39,8 @@ if(input.Control_Unit != null)
 
 if(input.Overlay_Asset != null)
 {
-    ov_dev = Devices[ID == input.Overlay_Asset];
+    ov_id = input.Overlay_Asset;
+    ov_dev = Devices[ID == ov_id];
     if(ov_dev.count() > 0)
     {
         if(input.Deployment_Status == "Active")
@@ -53,10 +58,12 @@ if(input.Overlay_Asset != null)
 }
 
 // 2. Synchronize Parent Rental Agreement Active Deployed Stations Counter
+// (Only applicable for Rental deployments with a valid Rental Agreement)
 if(input.Rental_Agreement != null)
 {
-    active_count = Bed_Stations[Rental_Agreement == input.Rental_Agreement && Deployment_Status == "Active"].count();
-    agr_rec = Rental_Agreements[ID == input.Rental_Agreement];
+    agr_id = input.Rental_Agreement;
+    active_count = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == "Active"].count();
+    agr_rec = Rental_Agreements[ID == agr_id];
     if(agr_rec.count() > 0)
     {
         agr_rec.Active_Deployed_Stations = active_count;
@@ -66,42 +73,56 @@ if(input.Rental_Agreement != null)
 // 3. Maintain Historical Timeline in Bed Station Logs (Interval Ledger)
 if(input.Deployment_Status == "Active")
 {
-    // Check if an active interval already exists for this bed station (open interval where Period_End_Date is null)
-    existing_active_log = Bed_Station_Logs[Bed_Station == input.ID && Period_End_Date == null];
+    // Check if an active interval already exists for this bed station
+    existing_active_log = Bed_Station_Logs[Bed_Station == current_station_id && Period_End_Date == null];
     if(existing_active_log.count() == 0)
     {
-        // Generate formatted sequence if not native auto-number
-        log_seq = Bed_Station_Logs.count() + 1;
-        log_id_code = "BSL-" + zoho.currentdate.getYear() + "-" + log_seq.leftPad(4, "0");
+        start_date = ifnull(input.Deployment_Start_Date, zoho.currenttime);
         
         insert into Bed_Station_Logs
         [
-            Bed_Station_Log_ID = log_id_code,
-            Bed_Station = input.ID,
-            Customer = input.Customer,
-            Rental_Agreement = input.Rental_Agreement,
-            Control_Unit = input.Control_Unit,
-            Overlay = input.Overlay_Asset,
-            Period_Start_Date = ifnull(input.Deployment_Start_Date, zoho.currenttime)
-        ];
+            Bed_Station = current_station_id
+            Customer = input.Customer
+            Rental_Agreement = input.Rental_Agreement
+            Control_Unit = input.Control_Unit
+            Overlay = input.Overlay_Asset
+            Period_Start_Date = start_date
+        ]
     }
 }
 else if(input.Deployment_Status == "Closed")
 {
     // Close any active pairing logs when the Bed Station is decommissioned
-    active_logs = Bed_Station_Logs[Bed_Station == input.ID && Period_End_Date == null];
+    active_logs = Bed_Station_Logs[Bed_Station == current_station_id && Period_End_Date == null];
     for each log in active_logs
     {
         close_ts = ifnull(input.Deployment_End_Date, zoho.currenttime);
         log.Period_End_Date = close_ts;
         
-        // Calculate operating duration in days
+        // Calculate operating duration in days (Number / BIGINT)
         if(log.Period_Start_Date != null)
         {
-            duration_hours = (close_ts - log.Period_Start_Date) / (1000 * 3600);
-            log.Duration_Days = (duration_hours / 24).round(2);
+            duration_days = log.Period_Start_Date.daysBetween(close_ts);
+            if(duration_days <= 0)
+            {
+                duration_days = 1;
+            }
+            log.Duration_Days = duration_days.toLong();
         }
     }
 }
 
-// 4. Submission Complete: Native Creator submission handling manages modal closure and report refresh.
+// 4. Ensure Bed Station Title includes generated Bed Station ID
+if(input.Bed_Station_ID != null)
+{
+    bst_rec = Bed_Stations[ID == current_station_id];
+    if(bst_rec.count() > 0)
+    {
+        curr_title = ifnull(bst_rec.Bed_Station_Title, "");
+        bst_id_str = input.Bed_Station_ID.toString();
+        if(curr_title != "" && !curr_title.contains(bst_id_str))
+        {
+            bst_rec.Bed_Station_Title = curr_title + " (" + bst_id_str + ")";
+        }
+    }
+}

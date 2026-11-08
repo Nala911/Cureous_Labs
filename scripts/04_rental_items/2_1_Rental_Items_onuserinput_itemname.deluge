@@ -1,0 +1,123 @@
+// ==============================================================================
+// Module Name  : Rental Items (Form Link Name: Rental_Items)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Field Actions -> Item_Name -> On User Input
+// File Path    : scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge
+// Fields Used  : [Item_Name, Item_ID, Product_Model, Billing_Unit]
+// Cross-Forms  : [Rental_Items]
+// Purpose      : Validates selection, guards against duplicate entry, queries
+//                Zoho Books via native integration to fetch Item ID, and
+//                automatically derives Product Model and Billing Unit.
+// Optimization : Single indexed duplicate count. Zero in-loop queries.
+// ==============================================================================
+
+if(input.Item_Name != null && input.Item_Name.trim() != "")
+{
+    // 1. Fast Duplicate Guard: Verify if item is already onboarded
+    existing_count = Rental_Items[Item_Name == input.Item_Name && ID != input.ID].count();
+    if(existing_count > 0)
+    {
+        alert "Item Already Onboarded:\n\n'" + input.Item_Name + "' is already registered in Rental Items.\n\nPlease select an un-onboarded item from the list.";
+        input.Item_ID = "";
+        input.Product_Model = "";
+        input.Billing_Unit = null;
+        return;
+    }
+    
+    // 2. Fetch Zoho Books Organization ID dynamically
+    org_id = "";
+    org_resp = zoho.books.getOrganizations();
+    if(org_resp.get("code") == 0)
+    {
+        org_list = org_resp.get("organizations");
+        if(org_list.size() > 0)
+        {
+            org_id = org_list.get(0).get("organization_id").toString();
+        }
+    }
+    
+    // Fallback: If you prefer to set your Organization ID directly, uncomment below:
+    // org_id = "YOUR_ORGANIZATION_ID";
+    
+    if(org_id != "")
+    {
+        // 3. Query active items list from Books
+        query_params = "filter_by=Status.Active&per_page=200";
+        books_resp = zoho.books.getRecords("items", org_id, query_params);
+        
+        if(books_resp.get("code") == 0 && books_resp.get("items") != null)
+        {
+            matched_item = null;
+            for each itm in books_resp.get("items")
+            {
+                if(itm.get("name") == input.Item_Name)
+                {
+                    matched_item = itm;
+                    break;
+                }
+            }
+            
+            if(matched_item != null)
+            {
+                // Set Item ID from Zoho Books
+                input.Item_ID = matched_item.get("item_id").toString();
+            }
+        }
+    }
+    
+    // 4. Auto-Derive Billing Unit
+    name_lower = input.Item_Name.toLowerCase();
+    if(name_lower.contains("monthly"))
+    {
+        input.Billing_Unit = "Month";
+    }
+    else
+    {
+        input.Billing_Unit = "Day";
+    }
+    
+    // 5. Auto-Derive Product Model
+    model_val = "";
+    if(name_lower.contains("eturnal home"))
+    {
+        model_val = "Eturnal Home";
+    }
+    else if(name_lower.contains("eturnal hospital"))
+    {
+        model_val = "Eturnal Hospital";
+    }
+    else if(name_lower.contains("eturnal one with foam"))
+    {
+        model_val = "Eturnal One with Foam";
+    }
+    else if(name_lower.contains("eturnal one"))
+    {
+        model_val = "Eturnal One";
+    }
+    else if(name_lower.contains("altern4"))
+    {
+        model_val = "Altern4";
+    }
+    else if(name_lower.contains("altern"))
+    {
+        model_val = "Altern";
+    }
+    else
+    {
+        // Clean model name by stripping "Rental", "Daily", "Monthly", hyphens, and symbols
+        clean_model = input.Item_Name;
+        clean_model = clean_model.replaceAll("Rental", "").replaceAll("rental", "");
+        clean_model = clean_model.replaceAll("Daily", "").replaceAll("daily", "");
+        clean_model = clean_model.replaceAll("Monthly", "").replaceAll("monthly", "");
+        clean_model = clean_model.replaceAll("™", "").replaceAll("®", "").replaceAll("-", "").trim();
+        model_val = clean_model;
+    }
+    input.Product_Model = model_val;
+}
+else
+{
+    // Selection cleared: Reset dependent fields
+    input.Item_ID = "";
+    input.Product_Model = "";
+    input.Billing_Unit = null;
+}

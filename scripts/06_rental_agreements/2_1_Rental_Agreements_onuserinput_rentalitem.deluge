@@ -1,16 +1,16 @@
-/* ==============================================================================
-   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
-   Script Type  : Field Workflow (On User Input)
-   Trigger Hook : Field Actions -> Rental_Item -> On User Input
-   File Path    : scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge
-   Fields Used  : [Rental_Item, Customer, Rental_Agreement_ID, Billing_Unit, Agreement_Start_Date, Agreement_Title]
-   Cross-Forms  : [Product_Catalog, Customers]
-   Purpose      : When Rental Item is selected, auto-generates the background Agreement ID,
-                  pulls Billing Unit from Product Catalog (read-only context), defaults
-                  Start Date to today if empty, and auto-fills Agreement Title while
-                  leaving it fully editable by the user.
-   Optimization : Single indexed lookup on Product_Catalog and Customers.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Field Actions -> Rental_Item -> On User Input
+// File Path    : scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge
+// Fields Used  : [Rental_Item, Customer, Rental_Agreement_ID, Billing_Unit, Agreement_Start_Date, Agreement_Title]
+// Cross-Forms  : [Rental_Items, Customers]
+// Purpose      : When Rental Item is selected, auto-generates the background Agreement ID,
+//                pulls Billing Unit from Rental Items (read-only context), defaults
+//                Start Date to today if empty, and auto-fills Agreement Title while
+//                leaving it fully editable by the user.
+// Optimization : Single indexed lookup on Rental_Items and Customers.
+// ==============================================================================
 
 if(input.Rental_Item != null)
 {
@@ -29,8 +29,9 @@ if(input.Rental_Item != null)
         input.Agreement_Start_Date = zoho.currentdate;
     }
     
-    // 3. Fetch Product Catalog details and populate Billing Unit (Context field)
-    item_rec = Product_Catalog[ID == input.Rental_Item];
+    // 3. Fetch Rental Items details and populate Billing Unit (Context field)
+    target_item_id = input.Rental_Item;
+    item_rec = Rental_Items[ID == target_item_id];
     if(item_rec.count() > 0)
     {
         item_name = ifnull(item_rec.Item_Name, "");
@@ -53,7 +54,8 @@ if(input.Rental_Item != null)
         cust_name = "";
         if(input.Customer != null)
         {
-            cust_rec = Customers[ID == input.Customer];
+            cust_id = input.Customer;
+            cust_rec = Customers[ID == cust_id];
             cust_name = ifnull(cust_rec.Customer_Name, "");
         }
         
@@ -75,7 +77,8 @@ else
     // Retain customer name if Customer is still selected, else clear
     if(input.Customer != null)
     {
-        cust_rec = Customers[ID == input.Customer];
+        cust_id = input.Customer;
+        cust_rec = Customers[ID == cust_id];
         input.Agreement_Title = ifnull(cust_rec.Customer_Name, "");
     }
     else

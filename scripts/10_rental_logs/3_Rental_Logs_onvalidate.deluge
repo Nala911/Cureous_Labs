@@ -1,0 +1,105 @@
+// ==============================================================================
+// Module Name  : Rental Logs (Form Link Name: Rental_Logs)
+// Script Type  : Form Workflow (On Validate)
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge
+// Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Agreed_Rate, Number_of_Days, Taxable_Value, GST_Rate, GST_Amount, Invoice_Amount, Billing_Status]
+// Cross-Forms  : [Rental_Logs, Devices]
+// Purpose      : Enforces mandatory inputs, validates chronological dates and positive rates,
+//                guards against overlapping billing intervals for the same bed station, and
+//                ensures mathematical integrity of taxable base and GST calculations.
+// Optimization : Single criteria guard query with indexed variables. Zero try-catch blocks.
+// ==============================================================================
+
+curr_id = input.ID;
+
+// 1. Mandatory Field Validations
+if(input.Bed_Station == null)
+{
+    alert "Validation Error:\n\nPlease select a Bed Station.";
+    cancel submit;
+}
+
+if(input.Control_Unit == null)
+{
+    alert "Validation Error:\n\nPlease select a Control Unit asset.";
+    cancel submit;
+}
+
+if(input.Overlay == null)
+{
+    alert "Validation Error:\n\nPlease select an Overlay mattress asset.";
+    cancel submit;
+}
+
+if(input.Usage_Start_Date == null)
+{
+    alert "Validation Error:\n\nPlease specify the Usage Start Date.";
+    cancel submit;
+}
+
+if(input.Usage_End_Date == null)
+{
+    alert "Validation Error:\n\nPlease specify the Usage End Date.";
+    cancel submit;
+}
+
+// 2. Chronological Date Order Guard
+if(input.Usage_End_Date < input.Usage_Start_Date)
+{
+    alert "Validation Error:\n\nUsage End Date (" + input.Usage_End_Date + ") cannot be earlier than Usage Start Date (" + input.Usage_Start_Date + ").";
+    cancel submit;
+}
+
+// 3. Commercial Rate & Duration Validation
+if(input.Agreed_Rate == null || input.Agreed_Rate <= 0)
+{
+    alert "Validation Error:\n\nPlease enter a valid positive Agreed Rate.";
+    cancel submit;
+}
+
+// 4. Overlap Guard (Prevent Duplicate Billing Periods on Same Bed Station)
+target_bed_id = input.Bed_Station;
+target_start = input.Usage_Start_Date;
+target_end = input.Usage_End_Date;
+
+if(curr_id != null)
+{
+    overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date <= target_end && Usage_End_Date >= target_start && Billing_Status != "Cancelled / Void" && ID != curr_id];
+}
+else
+{
+    overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date <= target_end && Usage_End_Date >= target_start && Billing_Status != "Cancelled / Void"];
+}
+
+if(overlapping_logs.count() > 0)
+{
+    conflict_rec = overlapping_logs.get(0);
+    log_id_str = ifnull(conflict_rec.Rental_Log_ID, "Existing Log");
+    alert "Duplicate Billing Overlap Detected:\n\nAn active rental log (" + log_id_str + ") already exists for this Bed Station covering an overlapping date range (" + conflict_rec.Usage_Start_Date + " to " + conflict_rec.Usage_End_Date + ").\n\nPlease adjust the usage dates to prevent double-billing.";
+    cancel submit;
+}
+
+// 5. Mathematical Computation Fallback Guarantees
+if(input.Number_of_Days == null || input.Number_of_Days <= 0)
+{
+    input.Number_of_Days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
+}
+
+if(input.Rental_Mode == "Fixed Monthly Rental")
+{
+    input.Taxable_Value = input.Agreed_Rate;
+}
+else
+{
+    input.Taxable_Value = input.Number_of_Days * input.Agreed_Rate;
+}
+
+gst_pct = 0.05;
+if(input.GST_Rate != null && input.GST_Rate > 0)
+{
+    gst_pct = input.GST_Rate / 100.0;
+}
+
+input.GST_Amount = input.Taxable_Value * gst_pct;
+input.Invoice_Amount = input.Taxable_Value + input.GST_Amount;

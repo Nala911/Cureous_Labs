@@ -1,30 +1,23 @@
-/* ==============================================================================
-   Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
-   Script Type  : Form Workflow (On User Input)
-   Trigger Hook : Form Actions -> On User Input -> Field: Transfer_Type
-   File Path    : scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge
-   Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Select_Control_Unit, Select_Overlay, Control_Unit_Number, Overlay_Number]
-   Cross-Forms  : [Locations]
-   Purpose      : Dynamically adjusts directional field visibility and resets choices
-                  based on the selected Transfer Type (Inter Branch, Office to Customer,
-                  Customer to Office). Keeps hardware selection hidden until Source is selected.
-   Optimization : Zero database queries consumed unless Inter Branch requires locations.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Stock Transfers (Form Link Name: Stock_Transfers)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Form Actions -> On User Input -> Field: Transfer_Type
+// File Path    : scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge
+// Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Select_Devices]
+// Cross-Forms  : [Locations]
+// Purpose      : Dynamically adjusts directional field visibility and resets choices
+//                based on the selected Transfer Type (Inter Branch, Office to Customer,
+//                Customer to Office). Keeps hardware selection hidden until Source is selected.
+// Optimization : Zero database queries consumed unless Inter Branch requires locations.
+// ==============================================================================
 
-// 1. Reset all dependent selections and counters whenever Transfer Type changes
-input.Select_Control_Unit = null;
-input.Select_Overlay = null;
-input.Control_Unit_Number = 0;
-input.Overlay_Number = 0;
+// 1. Reset device selection whenever Transfer Type changes
+input.Select_Devices = null;
+input.Select_Devices:ui.add(list());
 
-input.Select_Control_Unit:ui.add(List());
-input.Select_Overlay:ui.add(List());
-
-// Hide hardware selection fields until Source is explicitly selected
-hide Select_Control_Unit;
-hide Select_Overlay;
-disable Select_Control_Unit;
-disable Select_Overlay;
+// Hide hardware selection field until Source is explicitly selected
+hide Select_Devices;
+disable Select_Devices;
 
 // 2. Dynamic Directional Field Routing based on Transfer Type
 if(input.Transfer_Type == "Inter Branch")
@@ -39,7 +32,8 @@ if(input.Transfer_Type == "Inter Branch")
     // Ensure Destination choices are reset
     if(input.Source_Office != null)
     {
-        input.Destination_Office:ui.add(Locations[ID != input.Source_Office].ID.getAll());
+        s_id = input.Source_Office;
+        input.Destination_Office:ui.add(Locations[ID != s_id].ID.getAll());
     }
     else
     {
@@ -101,4 +95,9 @@ else
     disable Source_Customer;
     disable Destination_Office;
     disable Destination_Customer;
+    
+    input.Source_Office = null;
+    input.Source_Customer = null;
+    input.Destination_Office = null;
+    input.Destination_Customer = null;
 }

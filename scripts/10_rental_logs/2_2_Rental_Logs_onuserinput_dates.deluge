@@ -1,0 +1,54 @@
+// ==============================================================================
+// Module Name  : Rental Logs (Form Link Name: Rental_Logs)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Field Actions -> Usage_Start_Date / Usage_End_Date -> On User Input
+// File Path    : scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge
+// Fields Used  : [Usage_Start_Date, Usage_End_Date, Number_of_Days, Agreed_Rate, Rental_Mode, Taxable_Value, GST_Rate, GST_Amount, Invoice_Amount]
+// Cross-Forms  : None
+// Purpose      : Validates chronological date order, computes inclusive usage days, and updates taxable, GST, and invoice values.
+// Optimization : Mathematical in-memory evaluation with zero database overhead.
+// ==============================================================================
+
+if(input.Usage_Start_Date != null && input.Usage_End_Date != null)
+{
+    // Date sanity check
+    if(input.Usage_End_Date < input.Usage_Start_Date)
+    {
+        alert("Usage End Date cannot be earlier than Usage Start Date.");
+        input.Usage_End_Date = null;
+        input.Number_of_Days = null;
+        input.Taxable_Value = null;
+        input.GST_Amount = null;
+        input.Invoice_Amount = null;
+    }
+    else
+    {
+        // Compute inclusive days: (End - Start) + 1
+        num_days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
+        input.Number_of_Days = num_days;
+        
+        // Recalculate commercial totals if Agreed Rate is present
+        if(input.Agreed_Rate != null)
+        {
+            if(input.Rental_Mode == "Fixed Monthly Rental")
+            {
+                input.Taxable_Value = input.Agreed_Rate;
+            }
+            else
+            {
+                // Standard Pay Per Use (Daily) calculation
+                input.Taxable_Value = num_days * input.Agreed_Rate;
+            }
+            
+            // Apply statutory GST Rate (default 5.00%)
+            gst_pct = 0.05;
+            if(input.GST_Rate != null && input.GST_Rate > 0)
+            {
+                gst_pct = input.GST_Rate / 100.0;
+            }
+            
+            input.GST_Amount = input.Taxable_Value * gst_pct;
+            input.Invoice_Amount = input.Taxable_Value + input.GST_Amount;
+        }
+    }
+}

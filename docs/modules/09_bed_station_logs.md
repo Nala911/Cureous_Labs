@@ -19,7 +19,7 @@
 | 6 | **Overlay** | `Overlay` | Lookup | Read-Only Context | Target: `Devices` (Filtered to `Device_Type == "Overlay"`, Displaying `Serial_Number`). Clickable link to physical mattress asset. |
 | 7 | **Period Start Date** | `Period_Start_Date` | Date-Time | Mandatory | Timestamp when this exact hardware pairing became active on the bed station. |
 | 8 | **Period End Date** | `Period_End_Date` | Date-Time | Null while Active | Timestamp when unit was swapped or bed station closed; `null` while pairing is active. |
-| 9 | **Duration Days** | `Duration_Days` | Decimal / Formula | Read-Only Metric | Operating days during this specific pairing period. |
+| 9 | **Duration Days** | `Duration_Days` | Number (BIGINT) | Read-Only Metric | Operating days during this specific pairing period. |
 
 ---
 

@@ -22,7 +22,7 @@ All identifiers, modes, titles, and dates are auto-generated or derived by the s
 1. **Customer** `[Lookup -> Customers, displaying Customer_Name]` (Mandatory)
    - Field Link Name: `Customer`
    - Form Behavior: Visible & Enabled on Add; Locked in Edit mode.
-2. **Rental Item** `[Lookup -> Product_Catalog, displaying Item_Name]` (Mandatory)
+2. **Rental Item** `[Lookup -> Rental_Items, displaying Item_Name]` (Mandatory)
    - Field Link Name: `Rental_Item`
    - Form Behavior: Visible & Enabled on Add; Locked in Edit mode.
 3. **Agreed Rate** `[Currency / Decimal]` (Mandatory commercial rate)
@@ -76,7 +76,7 @@ All identifiers, modes, titles, and dates are auto-generated or derived by the s
 - **Plain English Logic**:
   - Step 1: Auto-generate `Rental_Agreement_ID` in the background if empty.
   - Step 2: Ensure `Agreement_Start_Date` is set to today if blank.
-  - Step 3: Query linked `Product_Catalog` record and set `Billing_Unit` ("Day" or "Month").
+  - Step 3: Query linked `Rental_Items` record and set `Billing_Unit` ("Day" or "Month").
   - Step 4: If `Customer` is also selected, dynamically auto-populate `Agreement_Title`: `[Customer Name] - [Item Name] ([Rental Agreement ID])`, keeping it user-editable.
 
 ### Workflow 3: On User Input (Step 2: Customer)

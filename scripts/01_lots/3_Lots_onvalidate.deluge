@@ -5,54 +5,80 @@
    File Path    : scripts/01_lots/3_Lots_onvalidate.deluge
    Purpose      : Validates Lot ID presence and uniqueness, sanitizes input,
                   and guarantees counter defaults before record commit.
-   Optimization : Max 1 indexed query for duplicate check on Add/Edit.
+   Optimization : Max 1 indexed query. Antigravity error tracing.
 ============================================================================== */
 
-// 1. Mandatory Check
-if(input.Lot_ID == null || input.Lot_ID.trim() == "")
-{
-    alert "Lot ID is mandatory. Please enter a valid Lot ID.";
-    cancel submit;
-}
+current_step = "1. Parse & initialize input context";
+debug_ctx = Map();
+debug_ctx.put("Record_ID", ifnull(input.ID, "New_Record"));
+debug_ctx.put("Lot_ID", input.Lot_ID);
 
-// 2. Sanitize Input (Trim whitespace and uppercase)
-clean_lot = input.Lot_ID.trim().toUpperCase();
-input.Lot_ID = clean_lot;
-
-// 3. Minimum Length Guard
-if(clean_lot.length() < 3)
+try 
 {
-    alert "Invalid Lot ID: Minimum length is 3 characters. Please enter a valid Lot ID.";
-    cancel submit;
-}
-
-// 4. Duplicate Check in 'Lots' Form
-if(input.ID == null)
-{
-    // New Record: check if Lot_ID already exists
-    existing_lots = Lots[Lot_ID == clean_lot];
-    if(existing_lots.count() > 0)
+    // 1. Mandatory Check
+    current_step = "1. Mandatory Check";
+    if(input.Lot_ID == null || input.Lot_ID.trim() == "")
     {
-        alert "Duplicate Lot ID: Manufacturing lot '" + clean_lot + "' already exists in the system.\n\nPlease check the Lot ID or use the existing lot from the Lots report.";
+        alert "Lot ID is mandatory. Please enter a valid Lot ID.";
         cancel submit;
     }
-}
-else
-{
-    // Existing Record (Edit): ensure no other record has this Lot_ID
-    existing_lots = Lots[Lot_ID == clean_lot && ID != input.ID];
-    if(existing_lots.count() > 0)
+
+    // 2. Sanitize Input (Trim whitespace and uppercase)
+    current_step = "2. Sanitize Input";
+    clean_lot = input.Lot_ID.trim().toUpperCase();
+    input.Lot_ID = clean_lot;
+    debug_ctx.put("Clean_Lot_ID", clean_lot);
+
+    // 3. Minimum Length Guard
+    current_step = "3. Minimum Length Guard";
+    if(clean_lot.length() < 3)
     {
-        alert "Duplicate Lot ID: Another record already exists with Lot ID '" + clean_lot + "'.\n\nPlease enter a unique Lot ID.";
+        alert "Invalid Lot ID: Minimum length is 3 characters. Please enter a valid Lot ID.";
         cancel submit;
     }
-}
 
-// 5. Default Numeric Counters to 0 if Null
-if(input.Total_CUs_Count == null) { input.Total_CUs_Count = 0; }
-if(input.Total_Overlays_Count == null) { input.Total_Overlays_Count = 0; }
-if(input.Total_Units_Count == null) { input.Total_Units_Count = 0; }
-if(input.CUs_In_Progress == null) { input.CUs_In_Progress = 0; }
-if(input.CUs_Rent_Ready == null) { input.CUs_Rent_Ready = 0; }
-if(input.Overlays_In_Progress == null) { input.Overlays_In_Progress = 0; }
-if(input.Overlays_Rent_Ready == null) { input.Overlays_Rent_Ready = 0; }
+    // 4. Duplicate Check in 'Lots' Form
+    current_step = "4. Duplicate Check";
+    if(input.ID == null)
+    {
+        existing_lots = Lots[Lot_ID == clean_lot];
+        if(existing_lots.count() > 0)
+        {
+            alert "Duplicate Lot ID: Manufacturing lot '" + clean_lot + "' already exists in the system.\n\nPlease check the Lot ID or use the existing lot from the Lots report.";
+            cancel submit;
+        }
+    }
+    else
+    {
+        existing_lots = Lots[Lot_ID == clean_lot && ID != input.ID];
+        if(existing_lots.count() > 0)
+        {
+            alert "Duplicate Lot ID: Another record already exists with Lot ID '" + clean_lot + "'.\n\nPlease enter a unique Lot ID.";
+            cancel submit;
+        }
+    }
+
+    // 5. Default Numeric Counters to 0 if Null
+    current_step = "5. Default Numeric Counters";
+    if(input.Total_CUs_Count == null) { input.Total_CUs_Count = 0; }
+    if(input.Total_Overlays_Count == null) { input.Total_Overlays_Count = 0; }
+    if(input.Total_Units_Count == null) { input.Total_Units_Count = 0; }
+    if(input.CUs_In_Progress == null) { input.CUs_In_Progress = 0; }
+    if(input.CUs_Rent_Ready == null) { input.CUs_Rent_Ready = 0; }
+    if(input.Overlays_In_Progress == null) { input.Overlays_In_Progress = 0; }
+    if(input.Overlays_Rent_Ready == null) { input.Overlays_Rent_Ready = 0; }
+}
+catch (e)
+{
+    err_payload = "=================== 🚨 ANTIGRAVITY ERROR REPORT ===================\n" +
+                  "File    : scripts/01_lots/3_Lots_onvalidate.deluge\n" +
+                  "Step    : " + current_step + "\n" +
+                  "Record  : " + ifnull(input.ID, "New_Record").toString() + "\n" +
+                  "Error   : " + e.toString() + "\n" +
+                  "Context : " + debug_ctx.toString() + "\n" +
+                  "==================================================================";
+    
+    info err_payload;
+    alert err_payload;
+    cancel submit;
+}

@@ -69,41 +69,111 @@ Trigger Numbering Sequence:
 - `4` = On Success (`4_<FormName>_onsuccess.deluge`)
 - `5+` = Custom Actions / Functions / Schedules
 
-Examples:
-- `1_Lots_onload.deluge`
-- `3_Lots_onvalidate.deluge`
-- `4_Lots_onsuccess.deluge`
-- `1_Customers_onload.deluge`
-- `2_1_Customers_onuserinput_customername.deluge`
-- `3_Customers_onvalidate.deluge`
-- `4_Customers_onsuccess.deluge`
-- `1_Stock_Transfers_onload.deluge`
-- `2_1_Stock_Transfers_onuserinput_transfertype.deluge`
-- `2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`
-- `2_3_Stock_Transfers_onuserinput_sourcecustomer.deluge`
-- `2_4_Stock_Transfers_onuserinput_selectcontrolunit.deluge`
-- `2_5_Stock_Transfers_onuserinput_selectoverlay.deluge`
-- `3_Stock_Transfers_onvalidate.deluge`
-- `4_Stock_Transfers_onsuccess.deluge`
-
 ### Script File Header Standard
-Every `.deluge` file must begin with this standardized header:
+Every `.deluge` file must begin with this standardized single-line comment header:
 ```deluge
-/* ==============================================================================
-   Module Name  : <Module Name> (Form Link Name: <Form_Link_Name>)
-   Script Type  : Form Workflow / Function / Schedule / Blueprint Action
-   Trigger Hook : <e.g. On User Input of Field_X | On Validate | On Success>
-   File Path    : scripts/<folder>/<filename>.deluge
-   Fields Used  : [<Field_1>, <Field_2>, ...]
-   Cross-Forms  : [<Related_Form_1>, ...]
-   Purpose      : <Plain English summary of what this code executes>
-   Optimization : <Notes on statement efficiency, batching, or query guards>
-============================================================================== */
+// ==============================================================================
+// Module Name  : <Module Name> (Form Link Name: <Form_Link_Name>)
+// Script Type  : Form Workflow / Function / Schedule / Blueprint Action
+// Trigger Hook : <e.g. On User Input of Field_X | On Validate | On Success>
+// File Path    : scripts/<folder>/<filename>.deluge
+// Fields Used  : [<Field_1>, <Field_2>, ...]
+// Cross-Forms  : [<Related_Form_1>, ...]
+// Purpose      : <Plain English summary of what this code executes>
+// Optimization : <Notes on statement efficiency, batching, or query guards>
+// ==============================================================================
 ```
 
 ---
 
-## 3. Deluge & Zoho One Optimization Guidelines
+## 3. Deluge Compiler Laws & Zero-Failure Coding Rules
+
+These rules are permanent and mandatory across all scripts in this project to prevent Deluge compiler crashes and `Improper Statement` errors:
+
+### Law 1: Criteria Brackets `[ ... ]` Integrity
+1. **NO Method Calls or Function Calls Inside `[ ... ]`**:
+   - Deluge translates `[...]` directly into database queries. Expressions like `.toLong()`, `.toString()`, `.trim()`, or custom functions inside criteria brackets crash the Deluge parser.
+   - **Violation**: `dev = Devices[ID == cu_id.toLong()];` (Triggers `Improper Statement` on enclosing block header).
+   - **Correct**: Always evaluate and assign variables *before* the criteria:
+     ```deluge
+     target_id = cu_id.toLong();
+     dev = Devices[ID == target_id];
+     ```
+2. **Strict Data-Type Parity in Criteria**:
+   - `NUMBER` fields (`ID`, Number, Currency) can ONLY be compared against `NUMBER` variables (`[ID == number_var]`).
+   - `TEXT` fields (`Serial_Number`, Single Line, Dropdown) can ONLY be compared against `TEXT` variables (`[Serial_Number == text_var]`).
+   - Comparing mismatched types triggers: `In Criteria left expression is of type NUMBER and right expression is of type TEXT and the operator == is not valid`.
+3. **Clean Variable Matching**:
+   - Never use dot-navigation inside criteria (e.g. `[Device_Ref == dev.ID]`). Extract to a local variable first:
+     ```deluge
+     d_id = dev.ID;
+     rec = Form[Device_Ref == d_id];
+     ```
+
+### Law 2: `insert into` Task Syntax
+1. **NO Semicolons and NO Commas Inside `[ ... ]`**:
+   - Field assignments inside `insert into Form [ ... ]` are structural assignments separated ONLY by newlines.
+   - Putting semicolons (`;`) or commas (`,`) after field lines inside the brackets crashes the Deluge parser with a misleading `Improper Statement` on the outer enclosing block.
+   - **Correct Syntax**:
+     ```deluge
+     insert into Target_Form
+     [
+         Field_1 = val1
+         Field_2 = val2
+         Field_3 = val3
+     ]
+     ```
+   - When capturing the generated record ID:
+     ```deluge
+     new_id = insert into Target_Form
+     [
+         Field_1 = val1
+         Field_2 = val2
+     ];
+     ```
+2. **NO Inline Comments Inside `insert into [ ... ]`**:
+   - Never place `//` or `/* */` comments inside square brackets of an `insert into` block.
+
+### Law 3: Record Updates (DML)
+- To update an existing record, fetch it first into a variable and assign fields directly:
+  ```deluge
+  dev = Devices[Serial_Number == serial];
+  if(dev != null)
+  {
+      dev.Current_Custody = "Dispatched";
+      dev.Current_Location = null;
+  }
+  ```
+- **NEVER use SQL-style `update Form [Criteria] [...]`**: Deluge does not support SQL syntax.
+
+### Law 4: Collection & Multi-Select Iteration
+1. **Iterate Native Fields Directly**:
+   - Multi-Select lookups and choice fields already evaluate to collections. Iterate them directly:
+     ```deluge
+     if(input.Select_Devices != null)
+     {
+         for each dev_serial in input.Select_Devices
+         {
+             dev = Devices[Serial_Number == dev_serial];
+         }
+     }
+     ```
+   - **Avoid unneeded intermediate list boxing**: Creating in-memory lists (`all_items = list()`) and populating them via `.add()` strips compile-time schema type information, causing the compiler to fail type checks inside the loop.
+2. **List Constructor Casing**:
+   - If declaring an empty list, always use lowercase `list()` (e.g. `items = list();`), never capitalized `List()`.
+
+### Law 5: Form Workflow Safety & Boundaries
+1. **NO `try-catch` in Form Workflows**:
+   - Form Workflows (On Load, On User Input, On Validate, On Success) do NOT support `try { ... } catch (e) { ... }`.
+   - `try-catch` is strictly reserved for **Standalone Deluge Functions** under `scripts/functions/`.
+2. **NO System Timestamps on `input`**:
+   - `input.Added_Time` and `input.Modified_Time` are not accessible on `input` in form workflows. Use `zoho.currentdate` / `zoho.currenttime`.
+3. **Single-Line Comments Only**:
+   - Always use `//` for comments in form workflows. Never use multi-line `/* ... */` blocks in workflow scripts to prevent line offset misreporting in the Creator compiler.
+
+---
+
+## 4. Deluge & Zoho One Optimization Guidelines
 
 To guarantee high performance and avoid quota/statement bottlenecks:
 1. **Never query inside loops**:
@@ -118,10 +188,29 @@ To guarantee high performance and avoid quota/statement bottlenecks:
 
 ---
 
-## 4. User-to-Assistant Input Protocol
+## 5. Schema Alignment & Verification Protocol
 
-Whenever implementing or refining a module, the following details are coordinated:
-1. **Form Link Name**: Exact internal API name of the form (e.g., `Lot_Master` vs `Lot_Masters`).
-2. **Report Link Name**: Exact link name of the default report (e.g., `All_Lot_Masters`), used when querying records via Deluge.
-3. **Field Link Names**: Exact API names of all fields referenced in workflows (e.g., `Lot_ID`, `Lot_Status`, `Manufacturing_Year`).
-4. **Lookup Target Names**: Target form and displayed field names for relational fields.
+Before writing or modifying any workflow code:
+1. **Mandatory Schema Verification**:
+   - Confirm exact internal **Form Link Name** (e.g., `Stock_Transfer_Items` vs `Stock_Transfer_Item`).
+   - Confirm exact internal **Field Link Names** for all referenced fields.
+   - Confirm exact **Field Data Types** (e.g., is the field storing a `TEXT` Serial Number or a `NUMBER` Record ID?).
+2. **Data Dictionary Synchronization**:
+   - Update `docs/DATA_DICTIONARY.md` before generating code.
+   - Verify all cross-form lookups and dependencies against the matrix.
+
+---
+
+## 6. Pre-Flight Code Quality Checklist
+
+Antigravity must mentally and statically verify every script against this 7-point checklist before delivering code:
+
+| # | Check | Rule |
+| :--- | :--- | :--- |
+| 1 | **Criteria Bracket Integrity** | Zero method calls inside `[...]`. All variables pre-assigned outside. |
+| 2 | **Type Parity** | `ID` compared only to numbers; `Serial_Number` compared only to text. |
+| 3 | **`insert into` Syntax** | Zero commas and zero semicolons inside `[...]`. No inline comments. |
+| 4 | **Direct Property Updates** | Record updates use `rec.Field = val;`, never SQL `update`. |
+| 5 | **Workflow Boundaries** | No `try-catch`, no `input.Added_Time`, no capital `List()`. |
+| 6 | **Comment Format** | Single-line `//` comments only. |
+| 7 | **Schema Link Parity** | 100% match with verified Link Names in `DATA_DICTIONARY.md`. |

@@ -6,121 +6,140 @@
    Purpose      : Validates mandatory Serial Number and Lot Number, prevents
                   duplicate registration, ensures valid syntax and classification,
                   and guarantees initial Device Stage, Rental State, and Current Custody fallbacks.
-   Optimization : Max 1 indexed query for duplicate check. Runs in <10ms.
+   Optimization : Max 1 indexed query for duplicate check. Antigravity error tracing.
 ============================================================================== */
 
-// 1. Mandatory Field Checks (Guarantees both Serial Number & Lot Number are provided)
-if(input.Serial_Number == null || input.Serial_Number.trim() == "")
-{
-    alert "Mandatory Field Missing:\n\nSerial Number is mandatory. Please enter or scan a device serial number.";
-    cancel submit;
-}
+current_step = "1. Parse & initialize input context";
+debug_ctx = Map();
+debug_ctx.put("Record_ID", ifnull(input.ID, "New_Record"));
+debug_ctx.put("Serial_Number", input.Serial_Number);
+debug_ctx.put("Lot_Number", input.Lot_Number);
 
-if(input.Lot_Number == null || input.Lot_Number == 0 || input.Lot_Number.toString().trim() == "")
+try 
 {
-    alert "Mandatory Field Missing:\n\nLot Number is mandatory. Please select the parent manufacturing lot from the dropdown.";
-    cancel submit;
-}
-
-// 2. Sanitize Serial Number (Format to standard uppercase)
-clean_sn = input.Serial_Number.trim().toUpperCase();
-input.Serial_Number = clean_sn;
-
-// 3. Duplicate Guard Check
-if(input.ID == null)
-{
-    existing_devices = Devices[Serial_Number == clean_sn];
-    if(existing_devices.count() > 0)
+    // 1. Mandatory Field Checks (Guarantees both Serial Number & Lot Number are provided)
+    current_step = "1. Mandatory Field Checks";
+    if(input.Serial_Number == null || input.Serial_Number.trim() == "")
     {
-        alert "Duplicate Device Prevented:\n\nDevice with Serial Number '" + clean_sn + "' is already registered in Cureous PRS.\n\nYou can view this device in the 'All Devices' report.";
+        alert "Mandatory Field Missing:\n\nSerial Number is mandatory. Please enter or scan a device serial number.";
         cancel submit;
     }
-}
-else
-{
-    existing_devices = Devices[Serial_Number == clean_sn && ID != input.ID];
-    if(existing_devices.count() > 0)
+
+    if(input.Lot_Number == null || input.Lot_Number == 0 || input.Lot_Number.toString().trim() == "")
     {
-        alert "Duplicate Device Prevented:\n\nAnother device with Serial Number '" + clean_sn + "' already exists.";
+        alert "Mandatory Field Missing:\n\nLot Number is mandatory. Please select the parent manufacturing lot from the dropdown.";
         cancel submit;
     }
-}
 
-// 4. Validate Serial Syntax & Derive Safety Fallbacks
-if(!clean_sn.contains("CU") && !clean_sn.contains("OV"))
+    // 2. Sanitize Serial Number (Format to standard uppercase)
+    current_step = "2. Sanitize Serial Number";
+    clean_sn = input.Serial_Number.trim().toUpperCase();
+    input.Serial_Number = clean_sn;
+    debug_ctx.put("Clean_Serial_Number", clean_sn);
+
+    // 3. Duplicate Guard Check
+    current_step = "3. Duplicate Guard Check";
+    if(input.ID == null)
+    {
+        existing_devices = Devices[Serial_Number == clean_sn];
+        if(existing_devices.count() > 0)
+        {
+            alert "Duplicate Device Prevented:\n\nDevice with Serial Number '" + clean_sn + "' is already registered in Cureous PRS.\n\nYou can view this device in the 'All Devices' report.";
+            cancel submit;
+        }
+    }
+    else
+    {
+        existing_devices = Devices[Serial_Number == clean_sn && ID != input.ID];
+        if(existing_devices.count() > 0)
+        {
+            alert "Duplicate Device Prevented:\n\nAnother device with Serial Number '" + clean_sn + "' already exists.";
+            cancel submit;
+        }
+    }
+
+    // 4. Validate Serial Syntax & Derive Safety Fallbacks
+    current_step = "4. Validate Serial Syntax & Derive Safety Fallbacks";
+    if(!clean_sn.contains("CU") && !clean_sn.contains("OV"))
+    {
+        alert "Invalid Serial Number Format:\n\nSerial Number must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+        cancel submit;
+    }
+
+    if(!clean_sn.startsWith("ALT4") && !clean_sn.startsWith("ALT") && !clean_sn.startsWith("ETO"))
+    {
+        alert "Invalid Model Prefix:\n\nSerial Number must begin with 'ALT4', 'ALT' (Altern4™) or 'ETO' (Eturnal One™).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+        cancel submit;
+    }
+
+    // Safety Fallback for Device Type
+    if(input.Device_Type == null || input.Device_Type == "")
+    {
+        if(clean_sn.contains("CU"))
+        {
+            input.Device_Type = "Control Unit";
+        }
+        else if(clean_sn.contains("OV"))
+        {
+            input.Device_Type = "Overlay";
+        }
+    }
+
+    // Safety Fallback for Device Model
+    if(input.Device_Model == null || input.Device_Model == "")
+    {
+        if(clean_sn.startsWith("ALT4") || clean_sn.startsWith("ALT"))
+        {
+            input.Device_Model = "Altern4™";
+        }
+        else if(clean_sn.startsWith("ETO"))
+        {
+            input.Device_Model = "Eturnal One™";
+        }
+    }
+
+    // Safety Fallback for Initial Device Stage
+    if(input.Device_Stage == null || input.Device_Stage == "")
+    {
+        if(input.Device_Type == "Control Unit")
+        {
+            input.Device_Stage = "0 - CU Mfg Not Yet Started";
+        }
+        else if(input.Device_Type == "Overlay")
+        {
+            input.Device_Stage = "0 - OV Not Yet Started";
+        }
+    }
+
+    // Safety Fallback for Initial Rental State
+    if(input.Rental_State == null || input.Rental_State == "")
+    {
+        input.Rental_State = "Inactive";
+    }
+
+    // Safety Fallback for Initial Custody
+    if(input.Current_Custody == null || input.Current_Custody == "")
+    {
+        input.Current_Custody = "Internal Office";
+    }
+
+    // Safety Fallback for Cumulative Days Used
+    if(input.Total_Cumulative_Days_Used == null)
+    {
+        input.Total_Cumulative_Days_Used = 0;
+    }
+}
+catch (e)
 {
-    alert "Invalid Serial Number Format:\n\nSerial Number must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+    err_payload = "=================== 🚨 ANTIGRAVITY ERROR REPORT ===================\n" +
+                  "File    : scripts/05_devices/3_Devices_onvalidate.deluge\n" +
+                  "Step    : " + current_step + "\n" +
+                  "Record  : " + ifnull(input.ID, "New_Record").toString() + "\n" +
+                  "Error   : " + e.toString() + "\n" +
+                  "Context : " + debug_ctx.toString() + "\n" +
+                  "==================================================================";
+    
+    info err_payload;
+    alert err_payload;
     cancel submit;
-}
-
-if(!clean_sn.startsWith("ALT4") && !clean_sn.startsWith("ALT") && !clean_sn.startsWith("ETO"))
-{
-    alert "Invalid Model Prefix:\n\nSerial Number must begin with 'ALT4', 'ALT' (Altern4™) or 'ETO' (Eturnal One™).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
-    cancel submit;
-}
-
-// Safety Fallback for Device Type
-if(input.Device_Type == null || input.Device_Type == "")
-{
-    if(clean_sn.contains("CU"))
-    {
-        input.Device_Type = "Control Unit";
-    }
-    else if(clean_sn.contains("OV"))
-    {
-        input.Device_Type = "Overlay";
-    }
-}
-
-// Safety Fallback for Device Model
-if(input.Device_Model == null || input.Device_Model == "")
-{
-    if(clean_sn.startsWith("ALT4") || clean_sn.startsWith("ALT"))
-    {
-        input.Device_Model = "Altern4™";
-    }
-    else if(clean_sn.startsWith("ETO"))
-    {
-        input.Device_Model = "Eturnal One™";
-    }
-}
-
-// Safety Fallback for Initial Device Stage
-if(input.Device_Stage == null || input.Device_Stage == "")
-{
-    if(input.Device_Type == "Control Unit")
-    {
-        input.Device_Stage = "0 - CU Mfg Not Yet Started";
-    }
-    else if(input.Device_Type == "Overlay")
-    {
-        input.Device_Stage = "0 - OV Not Yet Started";
-    }
-}
-
-// Safety Fallback for Rental State and Current Custody
-if(input.Rental_State == null || input.Rental_State == "")
-{
-    input.Rental_State = "Inactive";
-}
-
-if(input.Current_Custody == null || input.Current_Custody == "")
-{
-    input.Current_Custody = "Internal Office";
-}
-
-// Safety Fallback for Current Location (Hidden on Add mode; auto-assigned to Primary Hub)
-if(input.Current_Location == null)
-{
-    primary_wh = Locations[Is_Primary == true];
-    if(primary_wh.count() > 0)
-    {
-        input.Current_Location = primary_wh.ID;
-    }
-}
-
-// Safety Fallback for Total Cumulative Days Used
-if(input.Total_Cumulative_Days_Used == null)
-{
-    input.Total_Cumulative_Days_Used = 0;
 }

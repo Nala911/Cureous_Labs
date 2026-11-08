@@ -1,0 +1,111 @@
+// ==============================================================================
+// Module Name  : Rental Logs (Form Link Name: Rental_Logs)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Field Actions -> Bed_Station -> On User Input
+// File Path    : scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge
+// Fields Used  : [Bed_Station, Customer, Rental_Agreement, Rental_Item, Device_Model, Rental_Mode, Control_Unit, Overlay, Agreed_Rate, Usage_Start_Date, Usage_End_Date, Number_of_Days, Taxable_Value, GST_Rate, GST_Amount, Invoice_Amount]
+// Cross-Forms  : [Bed_Stations, Rental_Agreements, Rental_Items]
+// Purpose      : Auto-populates Customer, Agreement, Catalog Item, Model, Mode, Rate, and paired Devices when Bed Station is selected.
+// Optimization : Single-record direct lookups outside criteria brackets; zero in-loop queries.
+// ==============================================================================
+
+if(input.Bed_Station == null)
+{
+    // Clear dependent context fields
+    input.Customer = null;
+    input.Rental_Agreement = null;
+    input.Rental_Item = null;
+    input.Device_Model = null;
+    input.Rental_Mode = null;
+    input.Control_Unit = null;
+    input.Overlay = null;
+    input.Agreed_Rate = null;
+    input.Taxable_Value = null;
+    input.GST_Amount = null;
+    input.Invoice_Amount = null;
+}
+else
+{
+    // Step 1: Query selected Bed Station
+    target_bed_id = input.Bed_Station;
+    bed_rec = Bed_Stations[ID == target_bed_id];
+    
+    if(bed_rec != null)
+    {
+        // Populate customer and contract references
+        input.Customer = bed_rec.Customer;
+        input.Rental_Agreement = bed_rec.Rental_Agreement;
+        
+        // Auto-populate active paired hardware
+        input.Control_Unit = bed_rec.Control_Unit;
+        input.Overlay = bed_rec.Overlay_Asset;
+        
+        // Auto-populate Device Model from Bed Station's Rental Item
+        input.Device_Model = bed_rec.Rental_Item;
+        
+        // Step 2: Query linked Rental Agreement for commercial terms
+        if(bed_rec.Rental_Agreement != null)
+        {
+            target_agmt_id = bed_rec.Rental_Agreement;
+            agmt_rec = Rental_Agreements[ID == target_agmt_id];
+            
+            if(agmt_rec != null)
+            {
+                input.Rental_Item = agmt_rec.Rental_Item;
+                input.Agreed_Rate = agmt_rec.Agreed_Rate;
+                
+                // Fallback for Device Model from Rental Items if Bed Station has no rental item
+                if((input.Device_Model == null || input.Device_Model == "") && agmt_rec.Rental_Item != null)
+                {
+                    target_item_id = agmt_rec.Rental_Item;
+                    item_rec = Rental_Items[ID == target_item_id];
+                    if(item_rec != null)
+                    {
+                        input.Device_Model = ifnull(item_rec.Product_Model, item_rec.Item_Name);
+                    }
+                }
+                
+                // Determine rental mode from Billing Unit
+                if(agmt_rec.Billing_Unit == "Day")
+                {
+                    input.Rental_Mode = "Pay Per Use (Daily)";
+                }
+                else
+                {
+                    input.Rental_Mode = "Fixed Monthly Rental";
+                }
+            }
+        }
+        
+        // Step 3: Recalculate billing values if usage dates are already entered
+        if(input.Usage_Start_Date != null && input.Usage_End_Date != null && input.Agreed_Rate != null)
+        {
+            if(input.Usage_End_Date >= input.Usage_Start_Date)
+            {
+                start_days = input.Usage_Start_Date.toLong();
+                end_days = input.Usage_End_Date.toLong();
+                diff_days = (end_days - start_days) / 86400000;
+                calculated_days = diff_days + 1;
+                input.Number_of_Days = calculated_days;
+                
+                if(input.Rental_Mode == "Pay Per Use (Daily)")
+                {
+                    input.Taxable_Value = calculated_days * input.Agreed_Rate;
+                }
+                else
+                {
+                    input.Taxable_Value = input.Agreed_Rate;
+                }
+                
+                gst_pct = 0.05;
+                if(input.GST_Rate != null && input.GST_Rate > 0)
+                {
+                    gst_pct = input.GST_Rate / 100.0;
+                }
+                
+                input.GST_Amount = input.Taxable_Value * gst_pct;
+                input.Invoice_Amount = input.Taxable_Value + input.GST_Amount;
+            }
+        }
+    }
+}
