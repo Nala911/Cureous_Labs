@@ -9,12 +9,11 @@ Cureous_Labs/
 ├── docs/
 │   ├── ARCHITECTURE.md          # System overview, lifecycle, and integration roles
 │   ├── DATA_DICTIONARY.md       # Master field, link name, and dependency matrix
-│   ├── modules/                 # Module specifications (01 to 11)
-│   └── wizards/                 # Stateless bedside action workflows
+│   └── modules/                 # Module specifications (01 to 11)
 ├── scripts/                     # Standardized Deluge scripts organized by module
 │   ├── 01_lots/
 │   ├── 02_customers/
-│   ├── 03_locations/
+│   ├── 03_offices/
 │   ├── 04_product_catalog/
 │   ├── 05_devices/
 │   ├── 06_rental_agreements/
@@ -23,7 +22,6 @@ Cureous_Labs/
 │   ├── 09_bed_station_logs/
 │   ├── 10_rental_log/
 │   ├── 11_qc_sanitization/
-│   ├── wizards/
 │   └── functions/
 ├── GEMINI.md                    # Core architectural protocol and development rules
 ├── .gitignore

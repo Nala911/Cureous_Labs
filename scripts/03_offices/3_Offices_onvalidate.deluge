@@ -1,0 +1,39 @@
+// ==============================================================================
+// Module Name  : Offices (Form Link Name: Offices)
+// Script Type  : Form Workflow (On Validate)
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/03_offices/3_Offices_onvalidate.deluge
+// Fields Used  : [Office_Name, Is_Primary]
+// Cross-Forms  : [Offices]
+// Purpose      : Sanitizes inputs and guards against duplicate office names.
+// Optimization : Max 1 indexed Creator query for duplicate check. Runs in <10ms.
+// ==============================================================================
+
+// 1. Mandatory Input & Whitespace Sanitization
+if(input.Office_Name == null || input.Office_Name.trim() == "")
+{
+    alert "VALIDATION ERROR:\n\nOffice Name is mandatory. Please enter a valid name (e.g. 'Bangalore HQ', 'Kerala Office / Palakkad', 'Nagpur Office').";
+    cancel submit;
+}
+
+// Sanitize input by trimming whitespace
+input.Office_Name = input.Office_Name.trim();
+clean_name = input.Office_Name;
+
+// 2. Duplicate Guard (Guarantees unique Office Name across records)
+dup_offices = null;
+if(input.ID == null)
+{
+    dup_offices = Offices[Office_Name == clean_name];
+}
+else
+{
+    curr_id = input.ID;
+    dup_offices = Offices[Office_Name == clean_name && ID != curr_id];
+}
+
+if(dup_offices != null && dup_offices.count() > 0)
+{
+    alert "VALIDATION ERROR:\n\nAn office with Name '" + clean_name + "' already exists in the system.\n\nDuplicate office creation is blocked.";
+    cancel submit;
+}

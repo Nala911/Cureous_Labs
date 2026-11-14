@@ -3,36 +3,27 @@
 // Script Type  : Form Workflow
 // Trigger Hook : Created or Edited -> Field Actions -> Rental_Item -> On User Input
 // File Path    : scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge
-// Fields Used  : [Rental_Item, Customer, Rental_Agreement_ID, Billing_Unit, Agreement_Start_Date, Agreement_Title]
+// Fields Used  : [Rental_Item, Customer, Billing_Unit, Agreement_Start_Date, Agreement_Title]
 // Cross-Forms  : [Rental_Items, Customers]
-// Purpose      : When Rental Item is selected, auto-generates the background Agreement ID,
-//                pulls Billing Unit from Rental Items (read-only context), defaults
-//                Start Date to today if empty, and auto-fills Agreement Title while
-//                leaving it fully editable by the user.
+// Purpose      : When Rental Item is selected:
+//                1. Defaults Agreement_Start_Date to today if empty.
+//                2. Pulls Billing_Unit ("Day" or "Month") from Rental_Items silently in background.
+//                3. Auto-fills Agreement_Title ([Customer] - [Item]), leaving user free to edit.
 // Optimization : Single indexed lookup on Rental_Items and Customers.
 // ==============================================================================
 
 if(input.Rental_Item != null)
 {
-    // 1. Auto-generate Rental Agreement ID in background if not yet assigned
-    if(input.Rental_Agreement_ID == null || input.Rental_Agreement_ID.trim() == "")
-    {
-        current_year = zoho.currentdate.getYear();
-        agreement_count = Rental_Agreements[ID != null].count() + 1;
-        formatted_seq = agreement_count.toString().leftPad(4).replaceAll(" ", "0");
-        input.Rental_Agreement_ID = "RA-" + current_year + "-" + formatted_seq;
-    }
-    
-    // 2. Ensure Agreement Start Date is set to today if not already chosen
+    // 1. Ensure Agreement Start Date is set to today if not already chosen
     if(input.Agreement_Start_Date == null)
     {
         input.Agreement_Start_Date = zoho.currentdate;
     }
     
-    // 3. Fetch Rental Items details and populate Billing Unit (Context field)
+    // 2. Fetch Rental Items details and silently populate Billing Unit in the background
     target_item_id = input.Rental_Item;
     item_rec = Rental_Items[ID == target_item_id];
-    if(item_rec.count() > 0)
+    if(item_rec != null && item_rec.count() > 0)
     {
         item_name = ifnull(item_rec.Item_Name, "");
         b_unit = ifnull(item_rec.Billing_Unit, "");
@@ -41,7 +32,7 @@ if(input.Rental_Item != null)
         {
             input.Billing_Unit = b_unit;
         }
-        else if(item_name.toLowerCase().contains("monthly"))
+        else if(item_name.toLowerCase().contains("monthly") || item_name.toLowerCase().contains("month"))
         {
             input.Billing_Unit = "Month";
         }
@@ -50,7 +41,7 @@ if(input.Rental_Item != null)
             input.Billing_Unit = "Day";
         }
         
-        // 4. Auto-fill Agreement Title (Customer Name - Rental Item Name (ID))
+        // 3. Auto-fill Agreement Title (Customer Name - Rental Item Name)
         cust_name = "";
         if(input.Customer != null)
         {
@@ -61,11 +52,11 @@ if(input.Rental_Item != null)
         
         if(cust_name != "")
         {
-            input.Agreement_Title = cust_name + " - " + item_name + " (" + input.Rental_Agreement_ID + ")";
+            input.Agreement_Title = cust_name + " - " + item_name;
         }
         else
         {
-            input.Agreement_Title = item_name + " (" + input.Rental_Agreement_ID + ")";
+            input.Agreement_Title = item_name;
         }
     }
 }

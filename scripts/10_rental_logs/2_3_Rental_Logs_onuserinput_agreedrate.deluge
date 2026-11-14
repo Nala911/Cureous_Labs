@@ -3,22 +3,36 @@
 // Script Type  : Form Workflow
 // Trigger Hook : Created or Edited -> Field Actions -> Agreed_Rate -> On User Input
 // File Path    : scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge
-// Fields Used  : [Agreed_Rate, Number_of_Days, Rental_Mode, Taxable_Value, GST_Rate, GST_Amount, Invoice_Amount]
-// Cross-Forms  : None
-// Purpose      : Recalculates taxable value, statutory GST, and grand invoice amount when Agreed Rate is updated.
-// Optimization : Mathematical in-memory evaluation with zero database overhead.
+// Fields Used  : [Bed_Station, Agreed_Rate, Number_of_Days, Taxable_Value]
+// Cross-Forms  : [Bed_Stations, Rental_Agreements]
+// Purpose      : Recalculates taxable value when Agreed Rate is updated.
+//                (GST and Invoice Amount calculate automatically via native formula fields).
+// Optimization : Mathematical in-memory evaluation with max 2 indexed queries.
 // ==============================================================================
 
 if(input.Agreed_Rate == null || input.Agreed_Rate <= 0)
 {
     input.Taxable_Value = 0.00;
-    input.GST_Amount = 0.00;
-    input.Invoice_Amount = 0.00;
 }
 else
 {
-    // Determine base taxable value based on active rental mode
-    if(input.Rental_Mode == "Fixed Monthly Rental")
+    is_monthly = false;
+    if(input.Bed_Station != null)
+    {
+        b_id = input.Bed_Station;
+        b_rec = Bed_Stations[ID == b_id];
+        if(b_rec != null && b_rec.Rental_Agreement != null)
+        {
+            ag_id = b_rec.Rental_Agreement;
+            ag_rec = Rental_Agreements[ID == ag_id];
+            if(ag_rec != null && ag_rec.Billing_Unit == "Month")
+            {
+                is_monthly = true;
+            }
+        }
+    }
+    
+    if(is_monthly)
     {
         input.Taxable_Value = input.Agreed_Rate;
     }
@@ -28,14 +42,4 @@ else
         days = ifnull(input.Number_of_Days, 1);
         input.Taxable_Value = days * input.Agreed_Rate;
     }
-    
-    // Apply statutory GST Rate (default 5.00%)
-    gst_pct = 0.05;
-    if(input.GST_Rate != null && input.GST_Rate > 0)
-    {
-        gst_pct = input.GST_Rate / 100.0;
-    }
-    
-    input.GST_Amount = input.Taxable_Value * gst_pct;
-    input.Invoice_Amount = input.Taxable_Value + input.GST_Amount;
 }

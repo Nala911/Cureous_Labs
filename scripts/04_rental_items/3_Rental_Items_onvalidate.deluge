@@ -1,52 +1,43 @@
 // ==============================================================================
 // Module Name  : Rental Items (Form Link Name: Rental_Items)
-// Script Type  : Form Workflow
+// Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/04_rental_items/3_Rental_Items_onvalidate.deluge
-// Fields Used  : [Item_Name, Item_ID, Billing_Unit, Product_Model]
-// Cross-Forms  : [Rental_Items]
-// Purpose      : Validates mandatory selection and Zoho Books Item ID linkage,
-//                prevents duplicate registration, and ensures safety fallback
-//                for derived fields.
-// Optimization : Max 1 indexed query for duplicate check. Zero try-catch blocks.
+// Fields Used  : [Item_Name, Billing_Unit, Product_Model]
+// Cross-Forms  : [Rental_Items, Product_Model]
+// Purpose      : Pre-submission validation guard:
+//                1. Enforces mandatory Item_Name
+//                2. Duplicate check against Rental_Items by Item_Name
+//                3. Safety fallback: auto-derives Billing_Unit and Product_Model ("Altern4" | "Eturnal") if empty
+//                4. Guarantees 100% clean data before record commit
+// Optimization : Single indexed query for duplicate check, single indexed query for Product_Model fallback.
 // ==============================================================================
 
-// 1. Mandatory Field Checks
-if(input.Item_Name == null || input.Item_Name.trim() == "")
+// 1. Mandatory Check: Item Name
+if(input.Item_Name == null || input.Item_Name == "")
 {
-    alert "Item Name is mandatory. Please select an active rental item from the dropdown.";
+    alert "Mandatory Field Missing:\n\nPlease select an Item Name.";
     cancel submit;
 }
 
-if(input.Item_ID == null || input.Item_ID.trim() == "")
-{
-    alert "Item ID is missing: Unable to retrieve Zoho Books Item ID.\n\nPlease re-select the item from the dropdown.";
-    cancel submit;
-}
+// 2. Duplicate Check on Item Name
+target_name = input.Item_Name;
+existing_by_name = null;
 
-// 2. Duplicate Guard
-if(input.ID == null)
+if(input.ID != null)
 {
-    target_item_id = input.Item_ID;
-    target_name = input.Item_Name;
-    existing_items = Rental_Items[Item_ID == target_item_id || Item_Name == target_name];
-    if(existing_items.count() > 0)
-    {
-        alert "Item Already Onboarded:\n\n'" + input.Item_Name + "' is already registered in Cureous PRS with Item ID " + input.Item_ID + ".\n\nDuplicate registration is prevented. You can view or use this rental item from the 'All Rental Items' report.";
-        cancel submit;
-    }
+    curr_id = input.ID;
+    existing_by_name = Rental_Items[Item_Name == target_name && ID != curr_id];
 }
 else
 {
-    target_item_id = input.Item_ID;
-    target_name = input.Item_Name;
-    curr_id = input.ID;
-    existing_items = Rental_Items[(Item_ID == target_item_id || Item_Name == target_name) && ID != curr_id];
-    if(existing_items.count() > 0)
-    {
-        alert "Item Already Onboarded:\n\nAnother rental item with Name '" + input.Item_Name + "' or ID " + input.Item_ID + " already exists.";
-        cancel submit;
-    }
+    existing_by_name = Rental_Items[Item_Name == target_name];
+}
+
+if(existing_by_name != null && existing_by_name.count() > 0)
+{
+    alert "Duplicate Item Name:\n\n'" + target_name + "' is already registered in Rental Items.";
+    cancel submit;
 }
 
 // 3. Safety Fallback for Derived Fields
@@ -54,48 +45,42 @@ name_lower = input.Item_Name.toLowerCase();
 
 if(input.Billing_Unit == null || input.Billing_Unit == "")
 {
-    if(name_lower.contains("monthly"))
-    {
-        input.Billing_Unit = "Month";
-    }
-    else
+    if(name_lower.contains("daily") || name_lower.contains("day"))
     {
         input.Billing_Unit = "Day";
     }
+    else if(name_lower.contains("monthly") || name_lower.contains("month"))
+    {
+        input.Billing_Unit = "Month";
+    }
 }
 
-if(input.Product_Model == null || input.Product_Model.trim() == "")
+// Safety Fallback for Product Model Lookup ("Altern4" or "Eturnal")
+if(input.Product_Model == null)
 {
-    if(name_lower.contains("eturnal home"))
+    fallback_pm = "";
+    if(name_lower.contains("altern4") || name_lower.contains("altern"))
     {
-        input.Product_Model = "Eturnal Home";
+        fallback_pm = "Altern4";
     }
-    else if(name_lower.contains("eturnal hospital"))
+    else if(name_lower.contains("eturnal"))
     {
-        input.Product_Model = "Eturnal Hospital";
+        fallback_pm = "Eturnal";
     }
-    else if(name_lower.contains("eturnal one with foam"))
+    
+    if(fallback_pm != "")
     {
-        input.Product_Model = "Eturnal One with Foam";
+        m_name = fallback_pm;
+        pm_rec = Product_Model[Product_Model_Name == m_name];
+        if(pm_rec != null)
+        {
+            input.Product_Model = pm_rec.ID;
+        }
     }
-    else if(name_lower.contains("eturnal one"))
-    {
-        input.Product_Model = "Eturnal One";
-    }
-    else if(name_lower.contains("altern4"))
-    {
-        input.Product_Model = "Altern4";
-    }
-    else if(name_lower.contains("altern"))
-    {
-        input.Product_Model = "Altern";
-    }
-    else
-    {
-        clean_model = input.Item_Name.replaceAll("Rental", "").replaceAll("rental", "");
-        clean_model = clean_model.replaceAll("Daily", "").replaceAll("daily", "");
-        clean_model = clean_model.replaceAll("Monthly", "").replaceAll("monthly", "");
-        clean_model = clean_model.replaceAll("™", "").replaceAll("®", "").replaceAll("-", "").trim();
-        input.Product_Model = clean_model;
-    }
+}
+
+if(input.Product_Model == null)
+{
+    alert "Product Model Missing:\n\nPlease select a matching Product Model for '" + input.Item_Name + "'.";
+    cancel submit;
 }

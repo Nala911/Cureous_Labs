@@ -3,26 +3,18 @@
 // Script Type  : Form Workflow
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/10_rental_logs/1_Rental_Logs_onload.deluge
-// Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Agreed_Rate, Number_of_Days, Customer, Rental_Agreement, Rental_Item, Device_Model, Rental_Mode, Taxable_Value, GST_Rate, GST_Amount, Invoice_Amount, Billing_Status]
+// Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Agreed_Rate, Number_of_Days, Taxable_Value, Billing_Status]
 // Cross-Forms  : None
-// Purpose      : Controls field accessibility, initializes statutory tax rate, and sets billing status.
+// Purpose      : Controls field accessibility and initializes initial billing status.
 // Optimization : Pure UI manipulation with zero database queries.
 // ==============================================================================
 
 // Disable auto-derived context fields on both Add and Edit
-disable Customer;
-disable Rental_Agreement;
-disable Rental_Item;
-disable Device_Model;
-disable Rental_Mode;
 disable Taxable_Value;
-disable GST_Rate;
-disable GST_Amount;
-disable Invoice_Amount;
 disable Billing_Status;
 
 // Conditional logic for Add mode vs Edit mode
-if(input.Bed_Station == null && input.Usage_Start_Date == null)
+if(input.ID == null)
 {
     // ADD MODE: Enable interactive user entry fields
     enable Bed_Station;
@@ -33,8 +25,7 @@ if(input.Bed_Station == null && input.Usage_Start_Date == null)
     enable Agreed_Rate;
     enable Number_of_Days;
     
-    // Set statutory tax default (5% for Percentage field type) and initial billing status
-    input.GST_Rate = 5;
+    // Set initial billing status
     input.Billing_Status = "Pending Invoice";
 }
 else

@@ -9,7 +9,7 @@
 
 ## 1. Design Principle: Zero-Typing Customer Intake
 The user enters **ONLY ONE FIELD**: `Customer Name` selected from a dynamic Zoho Books customer dropdown!  
-No manual typing of IDs, customer types, addresses, or operational statuses. All hardware counters roll up automatically via transactional modules.
+No manual typing of IDs, customer types, addresses, or operational statuses. All customer asset summaries and device counts roll up dynamically via Zoho Creator Pages, Grouped Reports, and Detail View Related Lists (ensuring 100% live reporting without static counter columns).
 
 ---
 
@@ -32,23 +32,11 @@ No manual typing of IDs, customer types, addresses, or operational statuses. All
    - Field Link Name: `Billing_Address`
    - Form Behavior: Visible & Disabled on Add and Edit.
 
-### C. Metric & Lifecycle Fields (Hidden on Add - For Reports & Status Tracking Only):
-*Note: These fields make no sense when creating a new customer record. They are completely hidden on intake and utilized solely for reports and automated ledger rollups.*
+### C. Lifecycle Field:
 5. **Customer Status** `[Dropdown - Hidden on Add]` (Default: `"Active"`. Options: `"Active"`, `"Inactive"`)
    - Field Link Name: `Customer_Status`
    - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
-6. **Active Control Unit #** `[Number - Hidden on Add]` (Live count of CUs deployed/active with this customer)
-   - Field Link Name: `Active_Control_Unit_Count`
-   - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
-7. **Active Overlay #** `[Number - Hidden on Add]` (Live count of Overlays deployed/active with this customer)
-   - Field Link Name: `Active_Overlay_Count`
-   - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
-8. **Active Bed Stations #** `[Number - Hidden on Add]` (Live count of complete paired bed stations active on site)
-   - Field Link Name: `Active_Bed_Stations_Count`
-   - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
-9. **Spare Units #** `[Number - Hidden on Add]` (Count of emergency spare CUs/Overlays held on site)
-   - Field Link Name: `Spare_Units_Count`
-   - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
+   - Note: Asset summaries and counts per customer are rendered dynamically via Zoho Creator Pages, Grouped Reports, and Detail View Related Lists (preventing redundant static counter columns).
 
 ---
 
@@ -59,9 +47,9 @@ No manual typing of IDs, customer types, addresses, or operational statuses. All
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
   - Step 1: Disable context fields (`Customer_ID`, `Customer_Type`, `Billing_Address`) so user sees fetched details without editing.
-  - Step 2: In Add mode (`input.ID == null`), enable `Customer_Name` for user selection, and hide all metric/status fields (`Customer_Status`, `Active_Control_Unit_Count`, `Active_Overlay_Count`, `Active_Bed_Stations_Count`, `Spare_Units_Count`).
+  - Step 2: In Add mode (`input.ID == null`), enable `Customer_Name` for user selection, and hide `Customer_Status`.
   - Step 3: In Add mode, query Zoho Books API for active contacts, filter out already onboarded customers, sort alphabetically, and populate `Customer_Name` dropdown.
-  - Step 4: In Edit mode (`input.ID != null`), lock `Customer_Name` and lock all status and metric counters.
+  - Step 4: In Edit mode (`input.ID != null`), lock `Customer_Name` and lock `Customer_Status`.
 
 ### Workflow 2: On User Input (Step 1: Customer Name)
 - **File**: `scripts/02_customers/2_1_Customers_onuserinput_customername.deluge`
@@ -81,7 +69,7 @@ No manual typing of IDs, customer types, addresses, or operational statuses. All
 - **Plain English Logic**:
   - Step 1: Mandatory check: Ensure `Customer_Name` is selected and `Customer_ID` was retrieved.
   - Step 2: Duplicate check: Query `Customers` for existing `Customer_ID` or `Customer_Name` on other records (`ID != input.ID`). Alert and cancel submit if duplicate.
-  - Step 3: Default `Customer_Status = "Active"` and rollup counters to 0 if null.
+  - Step 3: Default `Customer_Status = "Active"` if null.
 
 ### Workflow 4: On Form Submission Success
 - **File**: `scripts/02_customers/4_Customers_onsuccess.deluge`

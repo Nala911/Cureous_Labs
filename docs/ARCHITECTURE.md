@@ -3,7 +3,7 @@
 
 **Domain**: Medical Device Manufacturing & Commercial Rentals (Dynamic Alternating Pressure Air Mattresses & Control Units)  
 **Platform**: Zoho Creator (Enterprise/Professional) + Zoho Books Integration  
-**Version**: 2.7.0 (Modular Documentation & Live Data Matrix Architecture)  
+**Version**: 2.8.0 (Product Model Master Architecture)  
 
 ---
 
@@ -18,7 +18,7 @@ A clinically functioning system consists of **TWO independent physical component
 ### Manufacturing & Lifecycle Independence
 - **Independent Manufacturing**: Control Units and Overlays are manufactured, assembled, tested, and inventoried completely independently.
 - **Dynamic Bedside Pairing**: They are **never** manufactured in fixed pairs. They are paired dynamically at the patient bedside in Module 8 (`Bed_Stations`).
-- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced via the Stateless Swap Wizard; the mattress remains untouched under the patient.
+- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced; the mattress remains untouched under the patient.
 
 ---
 
@@ -40,20 +40,21 @@ A clinically functioning system consists of **TWO independent physical component
 
 ---
 
-## 3. Product Tiers
+## 3. Product Model Master & Hardware Families
 
-Configured dynamically by administrators in `Rental_Items`:
-- **Altern4™**: Standard alternating pressure 4-inch system (basic institutional tier).
-- **Eturnal One™**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
-- **Eturnal One with Foam**: Premium tier featuring a safety foam underlay base to prevent patient bottoming-out during sudden power cuts.
-- Future models can be onboarded dynamically via Zoho Books item sync.
+Centrally managed in the **`Product Model`** master form (`Product_Model`), serving as the authoritative source of truth for physical devices (`Devices`) and commercial rental catalog items (`Rental_Items`):
+- **Altern4**: Standard alternating pressure 4-inch system (basic institutional tier).
+- **Altern8**: Advanced alternating pressure 8-inch system.
+- **EturnalOne**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
+- **Eturnal One with foam**: Premium tier featuring a safety foam underlay base to prevent patient bottoming-out during sudden power cuts.
+- New models can be added dynamically to `Product_Model`, instantly becoming available for device intake and bedside compatibility checks without script changes.
 
 ---
 
 ## 4. Manufacturing Lot Architecture
 
 - Devices are manufactured in production runs designated by **Lot Numbers** (e.g. `26HB04`).
-- **Mixed Product / Component Lots**: A single lot can contain any combination of Control Units and Overlays across multiple product models (Altern4™, Eturnal One™).
+- **Mixed Product / Component Lots**: A single lot can contain any combination of Control Units and Overlays across multiple product models (Altern4, Altern8, EturnalOne).
 - **Independent Progress**: Units inside the same lot advance through assembly and testing stages at different speeds, but their progress rolls up automatically into the parent `Lots` record.
 - **Gated Quality Certification**: No unit can be deployed to a customer or transferred to a branch until it passes Quality Control in Module 11 and receives a "Passed & Certified" clinical clearance.
 
@@ -66,9 +67,9 @@ The architecture maintains clean boundaries between Zoho Creator (operational ha
 1. **Customers Onboarding**:
    - Creator pulls active customer contacts from Zoho Books via native API.
    - Creator stores `Customer_ID` (Books Contact ID), locks financial details, and prevents manual data entry errors.
-2. **Branch Offices & Locations (Rule 55 CGST Delivery Challans)**:
-   - Creator `Locations` directly maps to the company's 3 GST-registered physical branch offices (Bangalore HQ, Kerala Office / Palakkad, and Nagpur Office).
-   - Zero virtual warehouses: Delivery Challans and E-Way bills generated through Books API use the branch's registered `location_id`, with statutory GSTINs and branch addresses handled natively in Zoho Books.
+2. **Branch Offices (Rule 55 CGST Delivery Challans)**:
+   - Creator `Offices` directly maps to the company's 3 GST-registered physical branch offices (Bangalore HQ, Kerala Office / Palakkad, and Nagpur Office).
+   - Zero virtual warehouses: Delivery Challans and E-Way bills generated through Books API use the branch office's registered address, with statutory GSTINs and branch addresses handled natively in Zoho Books.
 3. **Rental Items Sync**:
    - Creator rental items map 1:1 with Zoho Books rental service items, using `Books_Item_ID` as the billing line-item identifier.
 4. **Automated Books Invoice Push**:
@@ -80,7 +81,7 @@ The architecture maintains clean boundaries between Zoho Creator (operational ha
 ## 6. User Roles & Permission Matrix
 
 | Role | Lots | Customers | Devices | Stock Transfers | Bed Stations | Rental Logs | Books Invoicing |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Administrator** | Full | Full | Full | Full | Full | Full | Full |
 | **Production / Assembly** | Create/Edit | Read | Stages | Read | No Access | No Access | No Access |
 | **Warehouse Manager** | Read | Read | Full | Create/Edit | Read | Read | No Access |

@@ -45,7 +45,7 @@ All scripts are categorized into dedicated folders:
 scripts/
 ├── 01_lots/
 ├── 02_customers/
-├── 03_locations/
+├── 03_offices/
 ├── 04_product_catalog/
 ├── 05_devices/
 ├── 06_rental_agreements/
@@ -141,7 +141,7 @@ These rules are permanent and mandatory across all scripts in this project to pr
   if(dev != null)
   {
       dev.Current_Custody = "Dispatched";
-      dev.Current_Location = null;
+      dev.Current_Office = null;
   }
   ```
 - **NEVER use SQL-style `update Form [Criteria] [...]`**: Deluge does not support SQL syntax.
@@ -166,9 +166,11 @@ These rules are permanent and mandatory across all scripts in this project to pr
 1. **NO `try-catch` in Form Workflows**:
    - Form Workflows (On Load, On User Input, On Validate, On Success) do NOT support `try { ... } catch (e) { ... }`.
    - `try-catch` is strictly reserved for **Standalone Deluge Functions** under `scripts/functions/`.
-2. **NO System Timestamps on `input`**:
+2. **NO `return` in Form Workflows**:
+   - `return;` is an invalid keyword in event workflows (On Load, On User Input, On Validate, On Success). Using `return` crashes the Deluge compiler with `Improper Statement` on the enclosing block header. Use structured `if-else` branching to control execution flow.
+3. **NO System Timestamps on `input`**:
    - `input.Added_Time` and `input.Modified_Time` are not accessible on `input` in form workflows. Use `zoho.currentdate` / `zoho.currenttime`.
-3. **Single-Line Comments Only**:
+4. **Single-Line Comments Only**:
    - Always use `//` for comments in form workflows. Never use multi-line `/* ... */` blocks in workflow scripts to prevent line offset misreporting in the Creator compiler.
 
 ---
@@ -211,6 +213,6 @@ Antigravity must mentally and statically verify every script against this 7-poin
 | 2 | **Type Parity** | `ID` compared only to numbers; `Serial_Number` compared only to text. |
 | 3 | **`insert into` Syntax** | Zero commas and zero semicolons inside `[...]`. No inline comments. |
 | 4 | **Direct Property Updates** | Record updates use `rec.Field = val;`, never SQL `update`. |
-| 5 | **Workflow Boundaries** | No `try-catch`, no `input.Added_Time`, no capital `List()`. |
+| 5 | **Workflow Boundaries** | No `try-catch`, no `return;`, no `input.Added_Time`, no capital `List()`. |
 | 6 | **Comment Format** | Single-line `//` comments only. |
 | 7 | **Schema Link Parity** | 100% match with verified Link Names in `DATA_DICTIONARY.md`. |

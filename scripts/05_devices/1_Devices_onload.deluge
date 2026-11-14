@@ -1,18 +1,18 @@
-/* ==============================================================================
-   Module Name  : Devices (Form Link Name: Devices)
-   Script Type  : Form Workflow (On Load)
-   Trigger Hook : Created or Edited -> Form Actions -> On Load
-   File Path    : scripts/05_devices/1_Devices_onload.deluge
-   Fields Used  : [Serial_Number, Lot_Number, Device_Type, Device_Model, Device_Stage, Rental_State, Current_Custody, Current_Location, Current_Customer, Total_Cumulative_Days_Used]
-   Cross-Forms  : None
-   Purpose      : In Add mode: Enables Serial_Number and Lot_Number; keeps Device_Type
-                  and Device_Model disabled for visual context; hides lifecycle, custody,
-                  and metric fields while defaulting Total_Cumulative_Days_Used = 0.
-                  In Edit mode: Locks identity fields; enables Device_Stage and
-                  dynamically populates only the relevant stages for that hardware
-                  (Control Unit vs Overlay) to allow progressive stage updates.
-   Optimization : Zero database queries consumed. Runs in <5ms.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Devices (Form Link Name: Devices)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/05_devices/1_Devices_onload.deluge
+// Fields Used  : [Serial_Number, Lot_Number, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office, Current_Customer]
+// Cross-Forms  : None
+// Purpose      : In Add mode: Enables Serial_Number and Lot_Number; keeps Device_Type
+//                and Product_Model disabled for visual context; hides custody and
+//                lifecycle fields.
+//                In Edit mode: Locks identity fields; enables Device_Stage and
+//                dynamically populates only the relevant stages for that hardware
+//                (Control Unit vs Overlay) to allow progressive stage updates.
+// Optimization : Zero database queries consumed. Runs in <5ms.
+// ==============================================================================
 
 if(input.ID == null)
 {
@@ -24,20 +24,16 @@ if(input.ID == null)
     
     // 2. Context Fields: Disabled so user sees hardware classification without editing
     disable Device_Type;
-    disable Device_Model;
+    disable Product_Model;
     show Device_Type;
-    show Device_Model;
+    show Product_Model;
     
-    // 3. Metric, Custody, and Lifecycle Fields: Hidden during new device creation
+    // 3. Custody and Lifecycle Fields: Hidden during new device creation
     hide Current_Customer;
-    hide Current_Location;
-    hide Total_Cumulative_Days_Used;
+    hide Current_Office;
     hide Device_Stage;
     hide Rental_State;
     hide Current_Custody;
-    
-    // Initialize default counter
-    input.Total_Cumulative_Days_Used = 0;
 }
 else
 {
@@ -45,22 +41,20 @@ else
     disable Serial_Number;
     disable Lot_Number;
     
-    // Context, custody, and metric fields remain locked
+    // Context and custody fields remain locked
     disable Rental_State;
     disable Current_Custody;
     disable Device_Type;
-    disable Device_Model;
-    disable Current_Location;
+    disable Product_Model;
+    disable Current_Office;
     disable Current_Customer;
-    disable Total_Cumulative_Days_Used;
     
     show Rental_State;
     show Current_Custody;
     show Device_Type;
-    show Device_Model;
-    show Current_Location;
+    show Product_Model;
+    show Current_Office;
     show Current_Customer;
-    show Total_Cumulative_Days_Used;
     
     // 5. Dynamic Stage Progression: Populate stages based on Device Type
     dev_type = input.Device_Type;
@@ -78,9 +72,12 @@ else
     
     current_stage = input.Device_Stage;
     
+    // Clear all static choices so this device only displays its hardware-specific stages
+    clear Device_Stage;
+    
     if(dev_type == "Control Unit")
     {
-        cu_stages = List();
+        cu_stages = list();
         cu_stages.add("0 - CU Mfg Not Yet Started");
         cu_stages.add("1 - CU Enclosure Mfg in Progress");
         cu_stages.add("2 - CU Subsystems Assembled");
@@ -92,12 +89,12 @@ else
         cu_stages.add("CU Repair Needed");
         cu_stages.add("CU Disinfection Needed");
         
-        input.Device_Stage:ui.add(cu_stages);
+        Device_Stage:ui.add(cu_stages);
     }
     else if(dev_type == "Overlay")
     {
-        ov_stages = List();
-        ov_stages.add("0 - OV Not Yet Started");
+        ov_stages = list();
+        ov_stages.add("0 - OV Mfg Not Yet Started");
         ov_stages.add("1 - OV in Screen printing/Welding");
         ov_stages.add("2 - OV in Stitching");
         ov_stages.add("3 - OV Yet to Assemble");
@@ -108,7 +105,7 @@ else
         ov_stages.add("OV Repair Needed");
         ov_stages.add("OV Disinfection Needed");
         
-        input.Device_Stage:ui.add(ov_stages);
+        Device_Stage:ui.add(ov_stages);
     }
     
     // Re-assert current stage so selection is preserved

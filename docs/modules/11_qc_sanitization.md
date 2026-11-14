@@ -40,13 +40,9 @@
 
 - **If Overall QC Verdict == "Passed & Certified for Clinical Use"**:
   - Update `Devices`:
-    - `Current_Custody = "Internal Office"`
     - `Rental_State = "Inactive"`
     - `Device_Stage = "6 - CU Ready Condition"` (or `"6 - OV Ready Condition"`)
 - **If Overall QC Verdict == "Failed - Needs Repair"**:
   - Update `Devices`:
-    - `Current_Custody = "Internal Office"`
     - `Rental_State = "Inactive"`
     - `Device_Stage = "CU Repair Needed"` (or `"OV Repair Needed"`)
-- **Parent Lot Rollup**:
-  - Triggers `fn_recalculate_lot_metrics` to update Rent-Ready and In-Progress counters on the parent `Lots` record.

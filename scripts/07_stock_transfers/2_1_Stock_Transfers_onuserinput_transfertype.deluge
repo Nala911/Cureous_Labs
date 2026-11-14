@@ -3,21 +3,22 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Form Actions -> On User Input -> Field: Transfer_Type
 // File Path    : scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge
-// Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Select_Devices]
-// Cross-Forms  : [Locations]
+// Fields Used  : [Transfer_Type, Source_Office, Destination_Office, Source_Customer, Destination_Customer, Devices]
+// Cross-Forms  : [Offices]
 // Purpose      : Dynamically adjusts directional field visibility and resets choices
 //                based on the selected Transfer Type (Inter Branch, Office to Customer,
 //                Customer to Office). Keeps hardware selection hidden until Source is selected.
-// Optimization : Zero database queries consumed unless Inter Branch requires locations.
+// Optimization : Zero database queries consumed unless Inter Branch requires offices.
 // ==============================================================================
 
-// 1. Reset device selection whenever Transfer Type changes
-input.Select_Devices = null;
-input.Select_Devices:ui.add(list());
+// 1. Reset device selection and status whenever Transfer Type changes
+input.Devices = null;
+clear Devices;
+input.Transfer_Status = "In-Transit";
 
 // Hide hardware selection field until Source is explicitly selected
-hide Select_Devices;
-disable Select_Devices;
+hide Devices;
+disable Devices;
 
 // 2. Dynamic Directional Field Routing based on Transfer Type
 if(input.Transfer_Type == "Inter Branch")
@@ -33,11 +34,15 @@ if(input.Transfer_Type == "Inter Branch")
     if(input.Source_Office != null)
     {
         s_id = input.Source_Office;
-        input.Destination_Office:ui.add(Locations[ID != s_id].ID.getAll());
+        dest_offices = Offices[ID != s_id].ID.getAll();
+        clear Destination_Office;
+        Destination_Office:ui.add(dest_offices);
     }
     else
     {
-        input.Destination_Office:ui.add(Locations[ID != null].ID.getAll());
+        all_offices = Offices[ID != null].ID.getAll();
+        clear Destination_Office;
+        Destination_Office:ui.add(all_offices);
     }
     
     hide Source_Customer;
@@ -73,7 +78,9 @@ else if(input.Transfer_Type == "Customer to Office")
     
     show Destination_Office;
     enable Destination_Office;
-    input.Destination_Office:ui.add(Locations[ID != null].ID.getAll());
+    all_offices = Offices[ID != null].ID.getAll();
+    clear Destination_Office;
+    Destination_Office:ui.add(all_offices);
     
     hide Source_Office;
     disable Source_Office;

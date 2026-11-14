@@ -3,16 +3,17 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Rental_Agreement -> On User Input
 // File Path    : scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge
-// Fields Used  : [Rental_Agreement, Customer, Rental_Item, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset]
+// Fields Used  : [Rental_Agreement, Customer, Rental_Item, Bed_Station_Title, Control_Unit, Overlay_Asset]
 // Cross-Forms  : [Rental_Agreements, Customers, Rental_Items, Devices, Bed_Stations]
 // Purpose      : When a Rental Agreement is selected:
 //                1. Auto-populates Customer and Rental Item from agreement.
-//                2. Re-composes Bed Station Title.
-//                3. Dynamically queries Devices currently located at that customer's
-//                   site (Current_Customer == Customer) and filters Control Unit
-//                   and Overlay dropdowns accordingly.
-//                4. Validates Fixed Monthly 1-to-1 agreement limits with a notice.
-// Optimization : Max 1 indexed query per related form. Clean procedural Deluge.
+//                2. Pre-fills Bed Station Title with customer name if empty,
+//                   allowing user customization (e.g. room/ward info).
+//                3. Smart Hardware Filtering: Dynamically queries Devices physically
+//                   present at customer site and EXCLUDES devices already actively
+//                   deployed on other patient beds.
+//                4. Validates Fixed Monthly 1-to-1 agreement limits with an advisory notice.
+// Optimization : Targeted indexed queries outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
 if(input.Rental_Agreement != null)
@@ -25,7 +26,7 @@ if(input.Rental_Agreement != null)
         // 1. Auto-populate Customer lookup
         input.Customer = agr_rec.Customer;
         
-        // 2. Resolve Customer Name for Title composition
+        // 2. Resolve Customer Name for Title pre-fill
         cust_name = "";
         if(agr_rec.Customer != null)
         {
@@ -48,47 +49,69 @@ if(input.Rental_Agreement != null)
             }
         }
         
-        // 4. Auto-compose Bed Station Title
-        if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+        // 4. Pre-fill Bed Station Title if empty (leaves user free to customize)
+        if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
         {
             if(cust_name != "")
             {
-                input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim();
+                input.Bed_Station_Title = cust_name;
             }
-            else
-            {
-                input.Bed_Station_Title = input.Bed_Label.trim();
-            }
-        }
-        else if(cust_name != "")
-        {
-            input.Bed_Station_Title = cust_name;
         }
         
-        // 5. Dynamic Customer Hardware Retrieval
-        // Query devices physically present at this customer's facility
+        // 5. Smart Customer Hardware Retrieval
+        // Query devices at customer site that are NOT deployed in an Active Bed Station
         if(input.Customer != null)
         {
             c_target = input.Customer;
-            cu_devices = Devices[Current_Customer == c_target && Device_Type == "Control Unit"].ID.getAll();
-            ov_devices = Devices[Current_Customer == c_target && Device_Type == "Overlay"].ID.getAll();
+            curr_bed_id = 0;
+            if(input.ID != null)
+            {
+                curr_bed_id = input.ID;
+            }
+            
+            // Collect IDs of hardware already actively deployed on other stations at this facility
+            active_cu_ids = Bed_Stations[Customer == c_target && Deployment_Status == "Active" && ID != curr_bed_id].Control_Unit.getAll();
+            active_ov_ids = Bed_Stations[Customer == c_target && Deployment_Status == "Active" && ID != curr_bed_id].Overlay_Asset.getAll();
+            
+            // Fetch all hardware physically at this customer's site
+            all_cu_recs = Devices[Current_Customer == c_target && Device_Type == "Control Unit"];
+            all_ov_recs = Devices[Current_Customer == c_target && Device_Type == "Overlay"];
+            
+            // Filter strictly available units
+            avail_cu_ids = list();
+            for each cu in all_cu_recs
+            {
+                if(!active_cu_ids.contains(cu.ID))
+                {
+                    avail_cu_ids.add(cu.ID);
+                }
+            }
+            
+            avail_ov_ids = list();
+            for each ov in all_ov_recs
+            {
+                if(!active_ov_ids.contains(ov.ID))
+                {
+                    avail_ov_ids.add(ov.ID);
+                }
+            }
             
             // Clear prior hardware selections
             input.Control_Unit = null;
             input.Overlay_Asset = null;
             
-            // Populate lookup choices dynamically with customer-site devices
-            input.Control_Unit:ui.add(cu_devices);
-            input.Overlay_Asset:ui.add(ov_devices);
+            // Populate lookup choices dynamically with available customer-site devices
+            input.Control_Unit:ui.add(avail_cu_ids);
+            input.Overlay_Asset:ui.add(avail_ov_ids);
             
             // Enable hardware selection lookups
             enable Control_Unit;
             enable Overlay_Asset;
             
-            // Provide helpful feedback if customer site lacks available inventory
-            if(cu_devices.size() == 0 || ov_devices.size() == 0)
+            // Provide helpful feedback if customer site lacks available spare inventory
+            if(avail_cu_ids.size() == 0 || avail_ov_ids.size() == 0)
             {
-                alert "Inventory Notice:\n\nCustomer '" + cust_name + "' currently has " + cu_devices.size() + " Control Unit(s) and " + ov_devices.size() + " Overlay(s) at their site.\n\nPlease verify that a Stock Transfer ('Office to Customer') has been completed to deliver devices to this customer.";
+                alert "Inventory Notice:\n\nCustomer '" + cust_name + "' has " + avail_cu_ids.size() + " available Control Unit(s) and " + avail_ov_ids.size() + " available Overlay(s) at their site.\n\nPlease verify that a Stock Transfer ('Office to Customer') has been completed to deliver spare devices to this customer.";
             }
         }
         
@@ -99,29 +122,18 @@ if(input.Rental_Agreement != null)
             existing_active = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == "Active" && ID != curr_id];
             if(existing_active.count() > 0)
             {
-                alert "Contract Constraint Notice:\n\nThis Fixed Monthly Rental agreement already has an active Bed Station deployed:\n" + existing_active.Bed_Station_ID.getAll() + " (" + existing_active.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. Validation will prevent submission until the existing station is closed.";
+                alert "Notice for Fixed Monthly Contract:\n\nAgreement '" + agr_rec.Agreement_Title + "' already has an Active Bed Station assigned:\n" + existing_active.Bed_Station_ID.getAll() + " (" + existing_active.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements typically cover strictly 1 active station at a time. If you deploy a second station, please ensure a separate agreement is created or switch to a Daily agreement.";
             }
         }
     }
 }
 else
 {
-    // Selection cleared: Reset auto-derived fields and hardware lookups
+    // Rental Agreement cleared: Clear dependent fields
     input.Customer = null;
     input.Rental_Item = "";
     input.Control_Unit = null;
     input.Overlay_Asset = null;
-    input.Control_Unit:ui.add(list());
-    input.Overlay_Asset:ui.add(list());
     disable Control_Unit;
     disable Overlay_Asset;
-    
-    if(input.Bed_Label != null && input.Bed_Label.trim() != "")
-    {
-        input.Bed_Station_Title = input.Bed_Label.trim();
-    }
-    else
-    {
-        input.Bed_Station_Title = "";
-    }
 }

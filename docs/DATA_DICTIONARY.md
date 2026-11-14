@@ -12,29 +12,35 @@ Whenever any field, status, or logic is created, modified, or removed:
 ## High-Level Relational Entity Diagram
 
 ```
-[Lots] (Module 1)
-   │ (1:N)
-   ▼
-[Devices] (Module 5) ◄───── [Locations] (Module 3 - Warehouses/Branches)
-   │
-   ├──────────────────────────────┐
-   │ (N:M Line Items)             │ (Dynamic Bedside Pairing)
-   ▼                              ▼
-[Stock_Transfers] (Module 7)   [Bed_Stations] (Module 8) ◄─── [Customers] (Module 2)
-   │                              │                            ▲
-   │ (Auto-generates)             ├───────────────┐            │
-   ▼                              ▼               ▼            │
-[Stock_Transfer_Items]    [Bed_Station_Logs]  [Rental_Logs] ───┤
-                             (Module 9)        (Module 10)     │
-                                                   │           │
-                                                   ▼           │
-                                           [Rental_Agreements]─┘
-                                                (Module 6)
-                                                   ▲
-                                                   │
-                                          [Rental_Items]
-                                              (Module 4)
+[Product_Model] (Master)
+   │ (1:N)           │ (1:N)
+   ▼                 ▼
+[Devices] (Module 5) [Rental_Items] (Module 4)
+   ▲                       │
+   │ (1:N)                 │
+[Lots] (Module 1)          ▼
+   │                 [Rental_Agreements] (Module 6)
+   ▼                       │
+[Devices] ◄── [Offices]    │
+   │          (Module 3)   │
+   ├───────────────────────┼──────┐
+   │ (Multi-Select Lookup) │      │ (Dynamic Bedside Pairing)
+   ▼                       ▼      ▼
+[Stock_Transfers] (M7)   [Bed_Stations] (Module 8) ◄─── [Customers] (Module 2)
+                           │                            ▲
+                           ├───────────────┐            │
+                           ▼               ▼            │
+                         [Bed_Station_Logs] [Rental_Logs] ┘
+                          (Module 9)       (Module 10)
 ```
+
+---
+
+## Module: Product Model (`Product_Model`)
+
+| Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Product Model Name** | `Product_Model_Name` | Single Line | **User Entry** (Mandatory, Unique, PK Display; Enabled on Add/Edit) | — | `scripts/product_models/1_Product_Model_onload.deluge`<br>`scripts/product_models/3_Product_Model_onvalidate.deluge` | Display label for Module 4 (`Rental_Items.Product_Model`) and Module 5 (`Devices.Product_Model`) |
 
 ---
 
@@ -43,13 +49,6 @@ Whenever any field, status, or logic is created, modified, or removed:
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Lot ID** | `Lot_ID` | Single Line | **User Entry** (Mandatory, Unique, PK; Locked in Edit) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Module 5 (`Devices.Lot_Number`)<br>Module 11 (`Quality_Control.Lot_Number`) |
-| **Total CUs Count** | `Total_CUs_Count` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
-| **Total Overlays Count** | `Total_Overlays_Count` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
-| **Total Units Count** | `Total_Units_Count` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Sum: Total CUs + Total Overlays |
-| **CUs In Progress** | `CUs_In_Progress` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
-| **CUs Rent Ready** | `CUs_Rent_Ready` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
-| **Overlays In Progress** | `Overlays_In_Progress` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
-| **Overlays Rent Ready** | `Overlays_Rent_Ready` | Number | **Hidden on Add** (Report / Metric Only, Read-Only) | — | `scripts/01_lots/1_Lots_onload.deluge`<br>`scripts/01_lots/3_Lots_onvalidate.deluge` | Updated by `fn_recalculate_lot_metrics` |
 
 ---
 
@@ -62,20 +61,15 @@ Whenever any field, status, or logic is created, modified, or removed:
 | **Customer Type** | `Customer_Type` | Dropdown | **Disabled Context** (Read-Only: "Business", "Individual")| — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/02_customers/2_1_Customers_onuserinput_customername.deluge` | Commercial contract categorization |
 | **Billing Address** | `Billing_Address` | Multi-Line | **Disabled Context** (Read-Only, Synced Books) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/02_customers/2_1_Customers_onuserinput_customername.deluge` | Reference on challans and agreements |
 | **Customer Status** | `Customer_Status` | Dropdown | **Hidden on Add** (Report / Status Only, Read-Only) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/02_customers/3_Customers_onvalidate.deluge` | Active customer validation |
-| **Active Control Unit #** | `Active_Control_Unit_Count` | Number | **Hidden on Add** (Report / Rollup Only, Read-Only) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/functions/fn_recalculate_customer_active_assets.deluge` | Rollup from Module 5 & 8 |
-| **Active Overlay #** | `Active_Overlay_Count` | Number | **Hidden on Add** (Report / Rollup Only, Read-Only) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/functions/fn_recalculate_customer_active_assets.deluge` | Rollup from Module 5 & 8 |
-| **Active Bed Stations #** | `Active_Bed_Stations_Count` | Number | **Hidden on Add** (Report / Rollup Only, Read-Only) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/functions/fn_recalculate_customer_active_assets.deluge` | Rollup from Module 8 (`Bed_Station`) |
-| **Spare Units #** | `Spare_Units_Count` | Number | **Hidden on Add** (Report / Rollup Only, Read-Only) | — | `scripts/02_customers/1_Customers_onload.deluge`<br>`scripts/functions/fn_recalculate_customer_active_assets.deluge` | Emergency buffer units at site |
 
 ---
 
-## Module 3: Locations (`Locations`)
+## Module 3: Offices (`Offices`)
 
 | Field Label | Field Link Name | Type | Key / Constraint | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Location's Name** | `Location_s_Name` | Single Line | Mandatory, Unique | — | `scripts/03_locations/1_Locations_onload.deluge`<br>`scripts/03_locations/3_Locations_onvalidate.deluge` | Display label in `Devices.Current_Location` and `Stock_Transfers` |
-| **Location ID** | `Location_ID` | Single Line | Mandatory, Unique (Books Warehouse ID) | — | `scripts/03_locations/1_Locations_onload.deluge`<br>`scripts/03_locations/3_Locations_onvalidate.deluge` | Passed to Zoho Books API for Delivery Challans & E-Way Bills |
-| **Is Primary Hub** | `Is_Primary` | Decision (Checkbox) | Default: false | — | `scripts/03_locations/1_Locations_onload.deluge`<br>`scripts/03_locations/4_Locations_onsuccess.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Sets default intake warehouse in Module 5 (`Bangalore HQ`) |
+| **Office Name** | `Office_Name` | Single Line | Mandatory, Unique | — | `scripts/03_offices/1_Offices_onload.deluge`<br>`scripts/03_offices/3_Offices_onvalidate.deluge` | Display label in `Devices.Current_Office` and `Stock_Transfers` |
+| **Is Primary Hub** | `Is_Primary` | Decision (Checkbox) | Default: false | — | `scripts/03_offices/1_Offices_onload.deluge`<br>`scripts/03_offices/4_Offices_onsuccess.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Sets default intake warehouse in Module 5 (`Bangalore HQ`) |
 
 ---
 
@@ -83,10 +77,9 @@ Whenever any field, status, or logic is created, modified, or removed:
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Item Name** | `Item_Name` | Dropdown | **User Entry** (Mandatory, Synced Books; Locked in Edit) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Display label for `Rental_Agreements.Rental_Item` |
-| **Item ID** | `Item_ID` | Single Line | **Disabled Context** (PK / Books Item ID, Read-Only) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge` | Mapped to `Rental_Agreements.Books_Item_ID` and used in `Rental_Logs` invoicing |
-| **Product Model** | `Product_Model` | Single Line | **Disabled Context** (Read-Only) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge` | Auto-populates `Bed_Stations.Rental_Item` |
-| **Billing Unit** | `Billing_Unit` | Dropdown | **Disabled Context** (Read-Only: "Day", "Month") | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge` | Auto-populates `Rental_Agreement.Billing_Unit` |
+| **Item Name** | `Item_Name` | Dropdown | **User Entry** (Mandatory, Synced Books / Standard Choices; Locked in Edit) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Display label for `Rental_Agreements.Rental_Item` |
+| **Product Model** | `Product_Model` | Lookup | **Auto-Derived & Editable** (`Altern4` or `Eturnal`) | `Product_Model` (`Product_Model_Name`) | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Links hardware model family |
+| **Billing Unit** | `Billing_Unit` | Dropdown | **Auto-Derived & Editable** ("Day", "Month") | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Auto-populates `Rental_Agreement.Billing_Unit` |
 
 ---
 
@@ -95,15 +88,14 @@ Whenever any field, status, or logic is created, modified, or removed:
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Serial Number** | `Serial_Number` | Single Line | **User Entry** (Mandatory, Unique, PK; Locked in Edit) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Module 7 (`Stock_Transfers`), Module 8 (`Bed_Station`), Module 9, Module 10 |
-| **Lot Number** | `Lot_Number` | Lookup | **User Entry** (Mandatory; Locked in Edit) | `Lots` (`Lot_ID`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Updates Module 1 rollup counters via `fn_recalculate_lot_metrics` |
+| **Lot Number** | `Lot_Number` | Lookup | **User Entry** (Mandatory; Locked in Edit) | `Lots` (`Lot_ID`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Auto-filled with latest lot on serial input (editable by user); parent manufacturing run traceability |
 | **Device Type** | `Device_Type` | Dropdown | **Disabled Context** (Read-Only: "Control Unit", "Overlay") | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Auto-derived from serial string; filters lookups in Module 7 & 8 |
-| **Device Model** | `Device_Model` | Single Line | **Disabled Context** (Read-Only: Altern4™, Eturnal One™) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Auto-derived from serial prefix |
-| **Current Location** | `Current_Location` | Lookup | **Hidden on Add** (Report / Custody Only, Read-Only) | `Locations` (`Location_s_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Auto-initialized to Primary Hub; updated by Module 7 (`Stock_Transfers`) |
+| **Product Model** | `Product_Model` | Lookup | **Disabled Context** (Read-Only: Altern4, Altern8, EturnalOne, Eturnal One with foam) | `Product_Model` (`Product_Model_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Auto-derived from serial prefix |
+| **Current Office** | `Current_Office` | Lookup | **Hidden on Add** (Report / Custody Only, Read-Only) | `Offices` (`Office_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Auto-initialized to Primary Hub; updated by Module 7 (`Stock_Transfers`) |
 | **Current Customer** | `Current_Customer` | Lookup | **Hidden on Add** (Report / Custody Only, Read-Only) | `Customers` (`Customer_Name`) | `scripts/05_devices/1_Devices_onload.deluge` | Updated by Module 7 on customer delivery / collection |
-| **Total Cumulative Days Used** | `Total_Cumulative_Days_Used` | Number | **Hidden on Add** (Report / Metric Only, Read-Only, Default: 0) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Updated by Module 10 (`Rental_Logs`) |
-| **Device Stage** | `Device_Stage` | Dropdown | **Hidden on Add** (Auto-init Stage 0; Enabled in Edit mode with dynamic choices) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Stage gating for Module 7 dispatch and Module 11 QC |
+| **Device Stage** | `Device_Stage` | Dropdown | **Hidden on Add** (Auto-init Stage 0: "0 - CU Mfg Not Yet Started" / "0 - OV Mfg Not Yet Started"; Enabled in Edit mode with dynamic choices) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Auto-harmonized on bulk edit; Stage gating for Module 7 dispatch and Module 11 QC |
 | **Rental State** | `Rental_State` | Dropdown | **Hidden on Add** (Report / Status Only, Read-Only, Options: "Active", "Inactive") | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Updated by Module 8 (`Bed_Station`) on deployment |
-| **Current Custody** | `Current_Custody` | Dropdown | **Hidden on Add** (Report / Custody Only, Read-Only, Options: "Internal Office", "Dispatched", "In-Transit", "Customer's Site") | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Updated by Module 7 (`Stock_Transfers`) and Module 8 |
+| **Current Custody** | `Current_Custody` | Lookup | **Hidden on Add** (Report / Custody Only, Read-Only in Edit, Blank on Add) | `Stock_Transfers` (`Transfer_Status`) | `scripts/05_devices/1_Devices_onload.deluge` | Relational pointer to latest `Stock_Transfers` record; displays current `Transfer_Status` |
 
 ---
 
@@ -114,40 +106,29 @@ Whenever any field, status, or logic is created, modified, or removed:
 | **Customer** | `Customer` | Lookup | **User Entry** (Mandatory; Locked in Edit) | `Customers` (`Customer_Name`) | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_2_Rental_Agreements_onuserinput_customer.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Anchors contract client |
 | **Rental Item** | `Rental_Item` | Lookup | **User Entry** (Mandatory; Locked in Edit) | `Rental_Items` (`Item_Name`) | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Source for item pricing and Books item mapping |
 | **Agreed Rate** | `Agreed_Rate` | Currency | **User Entry** (Mandatory, Editable) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Default rate pulled into Module 10 (`Rental_Logs`) |
-| **Agreement Title** | `Agreement_Title` | Single Line | **User Entry** (Auto-filled on Cust/Item select, Editable) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge`<br>`scripts/06_rental_agreements/2_2_Rental_Agreements_onuserinput_customer.deluge` | Display label for Module 8, 9, 10 lookups |
+| **Agreement Title** | `Agreement_Title` | Single Line | **User Entry** (Auto-filled on Cust/Item select, Editable) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge`<br>`scripts/06_rental_agreements/2_2_Rental_Agreements_onuserinput_customer.deluge`<br>`scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge` | Display label for Module 8, 9, 10 lookups |
 | **Agreement Start Date** | `Agreement_Start_Date` | Date | **User Entry** (Auto-filled today, Editable) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Anchors recurring monthly billing cycles |
-| **Billing Unit** | `Billing_Unit` | Dropdown | **Disabled Context** (Read-Only: "Day", "Month") | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge` | Governs whether agreement permits multiple beds (Day) or 1-to-1 (Month) |
-| **Rental Agreement ID** | `Rental_Agreement_ID` | Single Line | **Hidden on Add** (Unique PK, generated in background) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Primary identifier in Module 8, 9, 10 |
+| **Billing Unit** | `Billing_Unit` | Dropdown | **Hidden on Add/Edit** (Auto-Derived Background Field: "Day", "Month") | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Governs whether agreement permits multiple beds (Day) or 1-to-1 (Month) |
+| **Rental Agreement ID** | `Rental_Agreement_ID` | Auto-Number | **Auto-Generated** (PK, Prefix `RA-`, e.g. `RA-0001`; Natively locked in Edit) | — | `scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge` | Primary identifier in Module 8, 9, 10 |
 | **Security Deposit** | `Security_Deposit` | Currency | **Hidden on Add** (Locked in Edit) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge` | Commercial deposit tracking |
 | **Agreement End Date** | `Agreement_End_Date` | Date | **Hidden on Add** (Filled on contract closure) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge` | Contract termination guard |
 | **Agreement Status** | `Agreement_Status` | Dropdown | **Hidden on Add** (Default: "Active" in background) | — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Active deployment validation |
-| **Active Deployed Stations** | `Active_Deployed_Stations` | Number | **Hidden on Add** (Report / Rollup Only, Read-Only, Default: 0)| — | `scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge`<br>`scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge` | Live counter updated on Module 8 (`Bed_Station`) |
 
 ---
 
-## Module 7: Stock Transfers & Line Items (`Stock_Transfers`)
+## Module 7: Stock Transfers (`Stock_Transfers`)
 
-### Parent Form: `Stock_Transfers`
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Transfer Type** | `Transfer_Type` | Dropdown | **User Entry** (Mandatory master trigger) | — | `scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge`<br>`scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge` | Master trigger controlling routing fields |
 | **Transfer Date** | `Transfer_Date` | Date | **User Entry** (Mandatory, Default: today, Editable) | — | `scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge` | Date of movement |
-| **Source Office** | `Source_Office` | Lookup | **User Entry** (Visible when Inter Branch or Office to Cust)| `Locations` (`Location_s_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge` | Filters available devices at originating warehouse |
+| **Source Office** | `Source_Office` | Lookup | **User Entry** (Visible when Inter Branch or Office to Cust)| `Offices` (`Office_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge` | Filters available devices at originating warehouse |
 | **Source Customer** | `Source_Customer` | Lookup | **User Entry** (Visible when Customer to Office) | `Customers` (`Customer_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/2_3_Stock_Transfers_onuserinput_sourcecustomer.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge` | Filters devices at originating customer site |
-| **Destination Office** | `Destination_Office` | Lookup | **User Entry** (Visible when Inter Branch or Cust to Office) | `Locations` (`Location_s_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Receiving branch warehouse |
+| **Destination Office** | `Destination_Office` | Lookup | **User Entry** (Visible when Inter Branch or Cust to Office) | `Offices` (`Office_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Receiving branch warehouse |
 | **Destination Customer**| `Destination_Customer`| Lookup | **User Entry** (Visible when Office to Customer) | `Customers` (`Customer_Name`) | `scripts/07_stock_transfers/2_1_Stock_Transfers_onuserinput_transfertype.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Receiving customer site |
-| **Select Devices** | `Select_Devices` | Multi-Select Lookup | **User Entry** (Visible once Source selected) | `Devices` (`Serial_Number`) | `scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/2_3_Stock_Transfers_onuserinput_sourcecustomer.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Populates child line items in `Stock_Transfer_Items` |
+| **Devices** | `Devices` | Multi-Select Lookup | **User Entry** (Visible once Source selected; Office-to-Customer restricted to `Ready Condition`) | `Devices` (`Serial_Number`) | `scripts/07_stock_transfers/2_2_Stock_Transfers_onuserinput_sourceoffice.deluge`<br>`scripts/07_stock_transfers/2_3_Stock_Transfers_onuserinput_sourcecustomer.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Direct multi-unit batch selection; synchronizes hardware ledger in `Devices` |
 | **Stock Transfer ID** | `Stock_Transfer_ID` | Auto-Number | **Auto-Hidden on Add** (PK; Natively locked in Edit) | — | — | Audit identifier |
-| **Transfer Status** | `Transfer_Status` | Dropdown | **User Entry** (Mandatory, Default: "Dispatched", Options: "Dispatched", "In-Transit", "Delivered") | — | `scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Triggers custody updates in Module 5 (`Devices`) |
-
-### Child Form: `Stock_Transfer_Items`
-| Field Label | Field Link Name | Type | Key / Constraint | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Transfer Item ID** | `Transfer_Item_ID` | Auto-Number | Primary Key | — | — | Audit identifier |
-| **Stock Transfer Ref** | `Stock_Transfer_Ref` | Lookup | Parent Link | `Stock_Transfers` | `scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Relational parent link |
-| **Device Ref** | `Device_Ref` | Lookup | Read-Only | `Devices` (`Serial_Number`) | `scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Foreign key to physical asset; displays Serial Number |
-| **Device Type** | `Device_Type` | Single Line | Read-Only | — | `scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Control Unit or Overlay |
-| **Device Model** | `Device_Model` | Single Line | Read-Only | — | `scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Hardware model family |
+| **Transfer Status** | `Transfer_Status` | Dropdown | **User Entry** (Mandatory, Default: "In-Transit", Options: "In-Transit", "In-Office", "With-Customer") | — | `scripts/07_stock_transfers/1_Stock_Transfers_onload.deluge`<br>`scripts/07_stock_transfers/3_Stock_Transfers_onvalidate.deluge`<br>`scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge` | Triggers custody updates in Module 5 (`Devices`) |
 
 ---
 
@@ -156,30 +137,31 @@ Whenever any field, status, or logic is created, modified, or removed:
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Deployment Type** | `Deployment_Type` | Dropdown | **User Entry** (Mandatory, Default: "Rental", Options: "Rental", "For Trial"; Locked in Edit) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge` | Determines commercial contract vs evaluation workflow |
-| **Rental Agreement** | `Rental_Agreement` | Lookup | **User Entry** (Mandatory when Deployment Type is "Rental", Hidden when "For Trial"; Locked in Edit) | `Rental_Agreements` (`Agreement_Title`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Auto-fills Customer and Rental Item; updates agreement active beds |
+| **Rental Agreement** | `Rental_Agreement` | Lookup | **User Entry** (Mandatory when Deployment Type is "Rental", Hidden when "For Trial"; Locked in Edit) | `Rental_Agreements` (`Agreement_Title`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Auto-fills Customer and Rental Item; validates contract limits |
 | **Customer** | `Customer` | Lookup | **User Entry / Context** (Disabled on "Rental"; Enabled on "For Trial"; Locked in Edit) | `Customers` (`Customer_Name`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Filters Control Unit and Overlay lookup choices; client snapshot |
-| **Bed Label** | `Bed_Label` | Single Line | **User Entry** (Mandatory, e.g. "ICU Bed 04") | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_5_Bed_Stations_onuserinput_bedlabel.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge` | Used to compose `Bed_Station_Title` |
-| **Bed Station Title** | `Bed_Station_Title` | Single Line | **User Entry** (Auto-filled, Editable) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/2_5_Bed_Stations_onuserinput_bedlabel.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge` | Display label for Module 9 (`Bed_Station_Log`) & Module 10 (`Rental_Logs`) |
-| **Control Unit** | `Control_Unit` | Lookup | **User Entry** (Mandatory; Filtered to Customer's Site; Locked in Edit) | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Populated dynamically from `Devices[Current_Customer == Customer]`; updates `Devices.Rental_State = "Active"` |
-| **Overlay Asset** | `Overlay_Asset` | Lookup | **User Entry** (Mandatory; Filtered to Customer's Site; Locked in Edit) | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Populated dynamically from `Devices[Current_Customer == Customer]`; updates `Devices.Rental_State = "Active"` |
+| **Bed Station Title** | `Bed_Station_Title` | Single Line | **User Entry** (Auto-prefilled from Customer/Contract, Editable, Appended with BST- ID on save) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Display label for Module 9 (`Bed_Station_Log`) & Module 10 (`Rental_Logs`) |
+| **Control Unit** | `Control_Unit` | Lookup | **User Entry** (Mandatory; Filtered to Customer's Site excluding Active Beds; Locked in Edit) | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Populated dynamically from `Devices[Current_Customer == Customer]`; updates `Devices.Rental_State = "Active"` |
+| **Overlay Asset** | `Overlay_Asset` | Lookup | **User Entry** (Mandatory; Filtered to Customer's Site excluding Active Beds; Locked in Edit) | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Populated dynamically from `Devices[Current_Customer == Customer]`; updates `Devices.Rental_State = "Active"` |
 | **Deployment Start Date**| `Deployment_Start_Date`| Date-Time | **User Entry** (Mandatory, Auto-filled, Editable) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge` | Initial pairing timestamp |
 | **Deployment Status** | `Deployment_Status` | Dropdown | **User Entry** (Mandatory: Active, Inactive, Closed) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_6_Bed_Stations_onuserinput_deploymentstatus.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Triggers custody updates and contract counters |
 | **Rental Item** | `Rental_Item` | Single Line | **Disabled Context** (Auto-filled from Agreement in Rental, or from Control Unit in Trial) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`<br>`scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge` | Hardware family description / Rental item name |
 | **Bed Station ID** | `Bed_Station_ID` | Auto-Number | **Disabled Context** (PK, e.g. `BST-0001`) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`<br>`scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Primary identifier in Module 9, 10 |
 | **Deployment End Date** | `Deployment_End_Date` | Date-Time | **Disabled Context** (Auto-filled on closure) | - | `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`<br>`scripts/08_bed_stations/2_6_Bed_Stations_onuserinput_deploymentstatus.deluge`<br>`scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge` | De-installation timestamp |
 
----## Module 9: Bed Station Logs (`Bed_Station_Logs`)
+---
+
+## Module 9: Bed Station Logs (`Bed_Station_Logs`)
 
 | Field Label | Field Link Name | Type | Key / Constraint | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Bed Station Log ID** | `Bed_Station_Log_ID` | Auto-Number | Primary Key | — | — | Audit ledger identifier |
-| **Bed Station** | `Bed_Station` | Lookup | Mandatory Foreign Key | `Bed_Stations` (`Bed_Station_Title`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`<br>`scripts/wizards/wizard_01_component_swap.deluge` | Clickable link to parent Bed Station |
+| **Bed Station** | `Bed_Station` | Lookup | Mandatory Foreign Key | `Bed_Stations` (`Bed_Station_Title`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Clickable link to parent Bed Station |
 | **Customer** | `Customer` | Lookup | Read-Only Context | `Customers` (`Customer_Name`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Clickable link to customer account |
 | **Rental Agreement** | `Rental_Agreement` | Lookup | Read-Only Context | `Rental_Agreements` (`Agreement_Title`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Clickable link to commercial contract |
-| **Control Unit** | `Control_Unit` | Lookup | Read-Only Context | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`<br>`scripts/wizards/wizard_01_component_swap.deluge` | Clickable link to deployed Control Unit |
-| **Overlay** | `Overlay` | Lookup | Read-Only Context | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`<br>`scripts/wizards/wizard_01_component_swap.deluge` | Clickable link to deployed Overlay mattress |
-| **Period Start Date** | `Period_Start_Date` | Date-Time | Mandatory | — | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`<br>`scripts/wizards/wizard_01_component_swap.deluge` | Start timestamp of this exact hardware combination |
-| **Period End Date** | `Period_End_Date` | Date-Time | Null while active | — | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`<br>`scripts/wizards/wizard_01_component_swap.deluge` | Closed on swap or station de-installation |
+| **Control Unit** | `Control_Unit` | Lookup | Read-Only Context | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Clickable link to deployed Control Unit |
+| **Overlay** | `Overlay` | Lookup | Read-Only Context | `Devices` (`Serial_Number`) | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Clickable link to deployed Overlay mattress |
+| **Period Start Date** | `Period_Start_Date` | Date-Time | Mandatory | — | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Start timestamp of this exact hardware combination |
+| **Period End Date** | `Period_End_Date` | Date-Time | Null while active | — | `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge` | Closed on swap or station de-installation |
 | **Duration Days** | `Duration_Days` | Number | Read-Only | — | — | Operating days during this specific pairing period |
 
 ---
@@ -189,22 +171,16 @@ Whenever any field, status, or logic is created, modified, or removed:
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Rental Log ID** | `Rental_Log_ID` | Auto-Number | **Disabled Context** (PK, Prefix `RL-`) | — | `docs/modules/10_rental_logs.md` | Primary Key billing log identifier |
-| **Bed Station** | `Bed_Station` | Lookup | **User Entry** (Mandatory) | `Bed_Stations` (`Bed_Station_Title`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Primary relational anchor; auto-fills Customer, Agreement, Serials |
+| **Bed Station** | `Bed_Station` | Lookup | **User Entry** (Mandatory) | `Bed_Stations` (`Bed_Station_Title`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Primary relational anchor; links Customer, Agreement, Serials |
 | **Control Unit** | `Control_Unit` | Lookup | **User Entry** (Mandatory, Auto-filled, Editable) | `Devices` (`Serial_Number`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Active Control Unit paired to bed |
 | **Overlay** | `Overlay` | Lookup | **User Entry** (Mandatory, Auto-filled, Editable) | `Devices` (`Serial_Number`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Active Overlay paired to bed |
 | **Usage Start Date** | `Usage_Start_Date` | Date | **User Entry** (Mandatory) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Billing start date |
 | **Usage End Date** | `Usage_End_Date` | Date | **User Entry** (Mandatory) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Billing end date |
 | **Agreed Rate** | `Agreed_Rate` | Currency | **User Entry** (Mandatory, Auto-filled, Editable) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`<br>`scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Daily or Monthly rate from Agreement |
 | **Number of Days** | `Number_of_Days` | Number | **User Entry / Auto-Computed** (Editable) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | Inclusive days: `(End - Start) + 1` |
-| **Customer** | `Customer` | Lookup | **Disabled Context** (Read-Only) | `Customers` (`Customer_Name`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge` | Client snapshot |
-| **Rental Agreement** | `Rental_Agreement` | Lookup | **Disabled Context** (Read-Only) | `Rental_Agreements` (`Agreement_Title`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge` | Contract terms |
-| **Rental Item** | `Rental_Item` | Lookup | **Disabled Context** (Read-Only) | `Rental_Items` (`Item_Name`) | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge` | Zoho Books line item mapping |
-| **Device Model** | `Device_Model` | Single Line | **Disabled Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge` | Model description (from `Bed_Station.Rental_Item`) |
-| **Rental Mode** | `Rental_Mode` | Single Line | **Disabled Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge` | "Pay Per Use (Daily)" or "Fixed Monthly Rental" |
-| **Taxable Value** | `Taxable_Value` | Currency | **Disabled Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge` | Base amount before GST |
-| **GST Rate (%)** | `GST_Rate` | Percentage | **Disabled Context** (Fixed: 5%, Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge` | Statutory GST rate |
-| **GST Amount** | `GST_Amount` | Currency | **Disabled Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge` | `Taxable_Value * 0.05` |
-| **Invoice Amount** | `Invoice_Amount` | Currency | **Disabled Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge` | Total: `Taxable_Value + GST_Amount` |
+| **Taxable Value** | `Taxable_Value` | Currency | **Auto-Computed Context** (Read-Only) | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/2_2_Rental_Logs_onuserinput_dates.deluge`<br>`scripts/10_rental_logs/2_3_Rental_Logs_onuserinput_agreedrate.deluge` | Base amount before GST |
+| **GST Amount** | `GST_Amount` | Formula | **Native Formula** (`Taxable_Value * 0.05`) | — | — | Native Formula Field; 5% GST value |
+| **Invoice Amount** | `Invoice_Amount` | Formula | **Native Formula** (`Taxable_Value + GST_Amount`) | — | — | Native Formula Field; Grand total invoice value |
 | **Billing Status** | `Billing_Status` | Dropdown | **Disabled Context** (Default: "Pending Invoice") | — | `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`<br>`scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge` | "Pending Invoice", "Invoiced", "Cancelled / Void" |
 
 ---

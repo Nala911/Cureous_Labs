@@ -3,7 +3,7 @@
 **Form Name**: `Bed Station Logs`  
 **Form Link Name**: `Bed_Station_Logs`  
 **Default Report**: `All_Bed_Station_Logs`  
-**Purpose**: Dedicated, continuous timeline and snapshot ledger for every device pairing at every Bed Station. Records the exact device combination active from Period Start Date to Period End Date. Populated exclusively by system triggers (Bed Station Initial Deployment, Stateless Swap Wizard, and Bed Station Closure). Strictly read-only and locked against manual user tampering.
+**Purpose**: Dedicated, continuous timeline and snapshot ledger for every device pairing at every Bed Station. Records the exact device combination active from Period Start Date to Period End Date. Populated exclusively by system triggers (Bed Station Initial Deployment and Bed Station Closure). Strictly read-only and locked against manual user tampering.
 
 ---
 
@@ -27,7 +27,7 @@
 
 - **Bed Station Title** (old field 3): Removed. The `Bed_Station` lookup field natively displays `Bed_Station_Title`, providing full visual context and a 1-click drill-down link without redundant data storage.
 - **Log Status** (old field 9): Removed. Redundant status tracking. An active pairing is naturally represented by `Period_End_Date == null`, while a closed pairing has a populated `Period_End_Date`.
-- **Trigger Event, Component Swapped, Swap Reason, Technician Name, Technician Notes** (old fields 11–15): Removed. Operational and clinical justifications are handled in service tickets/wizards. Eliminating these fields keeps the interval ledger lightweight, high-performance, and strictly focused on hardware timeline tracking.
+- **Trigger Event, Component Swapped, Swap Reason, Technician Name, Technician Notes** (old fields 11–15): Removed. Operational and clinical justifications are handled in service tickets or dedicated workflows. Eliminating these fields keeps the interval ledger lightweight, high-performance, and strictly focused on hardware timeline tracking.
 
 ---
 
@@ -36,7 +36,6 @@
 - **Immutable Read-Only Ledger**: Direct manual record creation, editing, or deletion is completely prohibited in standard user roles.
 - **System-Driven Population**: Records are created and closed exclusively via Deluge automations:
   1. `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`: Automatically creates initial active log record when a new Bed Station is deployed, and closes the active log when status is set to `"Closed"`.
-  2. `scripts/wizards/wizard_01_component_swap.deluge`: Automatically stamps `Period_End_Date` on the outgoing pairing and inserts a new active log record with the replacement asset.
 
 ---
 

@@ -4,11 +4,11 @@
 // Trigger Hook : Created or Edited -> Field Actions -> Control_Unit -> On User Input
 // File Path    : scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge
 // Fields Used  : [Deployment_Type, Control_Unit, Rental_Item]
-// Cross-Forms  : [Devices]
+// Cross-Forms  : [Devices, Product_Model]
 // Purpose      : When user selects a Control Unit in "For Trial" mode (or if Rental
 //                Item is currently blank), auto-populates Rental Item from the
-//                device's classified Device Model (e.g. Altern4™, Eturnal One™).
-// Optimization : 1 indexed query on Devices. Runs in <10ms.
+//                device's classified Product Model name (e.g. Altern4, Altern8, EturnalOne).
+// Optimization : 1 indexed query on Devices, 1 indexed query on Product_Model. Runs in <10ms.
 // ==============================================================================
 
 if(input.Control_Unit != null)
@@ -19,9 +19,14 @@ if(input.Control_Unit != null)
     {
         if(input.Deployment_Type == "For Trial" || input.Rental_Item == null || input.Rental_Item == "")
         {
-            if(cu_rec.Device_Model != null && cu_rec.Device_Model != "")
+            if(cu_rec.Product_Model != null)
             {
-                input.Rental_Item = cu_rec.Device_Model;
+                pm_id = cu_rec.Product_Model;
+                pm_rec = Product_Model[ID == pm_id];
+                if(pm_rec != null)
+                {
+                    input.Rental_Item = pm_rec.Product_Model_Name;
+                }
             }
         }
     }

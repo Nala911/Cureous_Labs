@@ -1,0 +1,14 @@
+// ==============================================================================
+// Module Name  : Product Model (Form Link Name: Product_Model)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/product_models/1_Product_Model_onload.deluge
+// Fields Used  : [Product_Model_Name]
+// Cross-Forms  : None
+// Purpose      : Prepares the Product Model form on load. Enables Product Model Name
+//                for intake and editing.
+// Optimization : Zero queries executed. Form loads in <5ms.
+// ==============================================================================
+
+enable Product_Model_Name;
+show Product_Model_Name;

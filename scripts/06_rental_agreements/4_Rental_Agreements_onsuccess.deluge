@@ -1,12 +1,31 @@
-/* ==============================================================================
-   Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
-   Script Type  : Form Workflow (On Success)
-   Trigger Hook : Created -> Form Actions -> On Success
-   File Path    : scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge
-   Purpose      : Navigates cleanly to the 'All_Rental_Agreements' report upon successful
-                  save, terminating the submit loading spinner immediately.
-   Optimization : 0 database queries consumed.
-============================================================================== */
+// ==============================================================================
+// Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Created -> Form Actions -> On Success
+// File Path    : scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge
+// Fields Used  : [Rental_Agreement_ID, Agreement_Title]
+// Cross-Forms  : [Rental_Agreements]
+// Purpose      : 1. Appends system-generated Rental_Agreement_ID to Agreement_Title.
+//                2. Navigates cleanly to the 'All_Rental_Agreements' report.
+// Optimization : Single atomic update by ID.
+// ==============================================================================
 
-// Redirect cleanly to the All_Rental_Agreements report (instantly dismisses submit loader)
+current_agr_id = input.ID;
+
+// 1. Ensure Agreement Title includes generated Rental Agreement ID
+if(input.Rental_Agreement_ID != null)
+{
+    agr_rec = Rental_Agreements[ID == current_agr_id];
+    if(agr_rec.count() > 0)
+    {
+        curr_title = ifnull(agr_rec.Agreement_Title, "");
+        agr_id_str = input.Rental_Agreement_ID.toString();
+        if(curr_title != "" && !curr_title.contains(agr_id_str))
+        {
+            agr_rec.Agreement_Title = curr_title + " (" + agr_id_str + ")";
+        }
+    }
+}
+
+// 2. Redirect cleanly to the All_Rental_Agreements report
 openUrl("#Report:All_Rental_Agreements", "same window");

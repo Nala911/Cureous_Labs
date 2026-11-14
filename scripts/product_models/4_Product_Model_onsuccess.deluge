@@ -1,0 +1,12 @@
+// ==============================================================================
+// Module Name  : Product Model (Form Link Name: Product_Model)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Form Actions -> On Success
+// File Path    : scripts/product_models/4_Product_Model_onsuccess.deluge
+// Fields Used  : None
+// Cross-Forms  : None
+// Purpose      : Smoothly redirects user to the All Product Models report.
+// Optimization : Instant redirect. Zero statement overhead.
+// ==============================================================================
+
+openUrl("#Report:All_Product_Models", "same window");

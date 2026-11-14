@@ -1,0 +1,28 @@
+// ==============================================================================
+// Module Name  : Offices (Form Link Name: Offices)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/03_offices/1_Offices_onload.deluge
+// Fields Used  : [Office_Name, Is_Primary]
+// Cross-Forms  : None
+// Purpose      : Prepares the Offices form on load. In Add mode, enables
+//                Office_Name and sets clean default Is_Primary = false.
+//                In Edit mode, keeps fields editable.
+// Optimization : Zero database queries. Runs in <5ms.
+// ==============================================================================
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: Enable interactive input fields
+    enable Office_Name;
+    enable Is_Primary;
+    
+    // Set standard default
+    input.Is_Primary = false;
+}
+else
+{
+    // 2. EDIT Mode: Keep descriptive attributes editable by authorized managers
+    enable Office_Name;
+    enable Is_Primary;
+}

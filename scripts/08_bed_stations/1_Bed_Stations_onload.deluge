@@ -3,7 +3,7 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/08_bed_stations/1_Bed_Stations_onload.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Rental_Item, Deployment_End_Date]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Rental_Item, Deployment_End_Date]
 // Cross-Forms  : None
 // Purpose      : Configures dynamic UI visibility and field states based on Add vs Edit
 //                mode. In Add mode, defaults Deployment_Type to "Rental", enables
@@ -30,10 +30,7 @@ if(input.ID == null)
     disable Customer;
     show Customer;
     
-    // Operational bed label and title
-    enable Bed_Label;
-    show Bed_Label;
-    
+    // Bed Station Title: Pre-filled from customer context, user-editable
     enable Bed_Station_Title;
     show Bed_Station_Title;
     
@@ -61,8 +58,6 @@ if(input.ID == null)
     disable Deployment_End_Date;
     show Deployment_End_Date;
     input.Deployment_End_Date = null;
-    
-    // Note: Bed_Station_ID is an Auto-Number field managed natively by Zoho Creator
 }
 else
 {
@@ -85,8 +80,7 @@ else
         show Rental_Agreement;
     }
     
-    // Allow operational updates to label, title, status, and start date
-    enable Bed_Label;
+    // Allow operational updates to title, status, and start date
     enable Bed_Station_Title;
     enable Deployment_Status;
     enable Deployment_Start_Date;
@@ -96,7 +90,6 @@ else
     show Rental_Item;
     show Control_Unit;
     show Overlay_Asset;
-    show Bed_Label;
     show Bed_Station_Title;
     show Deployment_Status;
     show Deployment_Start_Date;

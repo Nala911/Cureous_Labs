@@ -3,16 +3,17 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Customer -> On User Input
 // File Path    : scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge
-// Fields Used  : [Deployment_Type, Customer, Bed_Label, Bed_Station_Title, Control_Unit, Overlay_Asset]
-// Cross-Forms  : [Customers, Devices]
+// Fields Used  : [Deployment_Type, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset]
+// Cross-Forms  : [Customers, Devices, Bed_Stations]
 // Purpose      : Triggered when Customer is chosen directly (specifically in "For Trial"
 //                mode):
-//                1. Resolves Customer Name and updates Bed Station Title.
-//                2. Dynamically queries Devices currently located at this Customer's
-//                   site (Current_Customer == Customer).
+//                1. Resolves Customer Name and pre-fills Bed Station Title if empty.
+//                2. Smart Hardware Filtering: Dynamically queries Devices physically
+//                   present at customer site and EXCLUDES devices already actively
+//                   deployed on other patient beds.
 //                3. Populates Control Unit and Overlay dropdowns with available hardware.
 //                4. Activates hardware lookups and notifies user if inventory is empty.
-// Optimization : 1 indexed query on Customers, 2 indexed queries on Devices.
+// Optimization : Targeted indexed queries outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
 if(input.Customer != null)
@@ -25,41 +26,63 @@ if(input.Customer != null)
         cust_name = ifnull(cust_rec.Customer_Name, "");
     }
     
-    // 1. Re-compose Bed Station Title
-    if(input.Bed_Label != null && input.Bed_Label.trim() != "")
+    // 1. Pre-fill Bed Station Title if empty
+    if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
     {
         if(cust_name != "")
         {
-            input.Bed_Station_Title = cust_name + " - " + input.Bed_Label.trim();
+            input.Bed_Station_Title = cust_name;
         }
-        else
-        {
-            input.Bed_Station_Title = input.Bed_Label.trim();
-        }
-    }
-    else if(cust_name != "")
-    {
-        input.Bed_Station_Title = cust_name;
     }
     
-    // 2. Query Devices physically located at this Customer's site
-    cu_devices = Devices[Current_Customer == cust_id && Device_Type == "Control Unit"].ID.getAll();
-    ov_devices = Devices[Current_Customer == cust_id && Device_Type == "Overlay"].ID.getAll();
+    // 2. Smart Customer Hardware Retrieval
+    curr_bed_id = 0;
+    if(input.ID != null)
+    {
+        curr_bed_id = input.ID;
+    }
+    
+    // Collect IDs of hardware already actively deployed on other stations at this facility
+    active_cu_ids = Bed_Stations[Customer == cust_id && Deployment_Status == "Active" && ID != curr_bed_id].Control_Unit.getAll();
+    active_ov_ids = Bed_Stations[Customer == cust_id && Deployment_Status == "Active" && ID != curr_bed_id].Overlay_Asset.getAll();
+    
+    // Fetch all hardware physically at this customer's site
+    all_cu_recs = Devices[Current_Customer == cust_id && Device_Type == "Control Unit"];
+    all_ov_recs = Devices[Current_Customer == cust_id && Device_Type == "Overlay"];
+    
+    // Filter strictly available units
+    avail_cu_ids = list();
+    for each cu in all_cu_recs
+    {
+        if(!active_cu_ids.contains(cu.ID))
+        {
+            avail_cu_ids.add(cu.ID);
+        }
+    }
+    
+    avail_ov_ids = list();
+    for each ov in all_ov_recs
+    {
+        if(!active_ov_ids.contains(ov.ID))
+        {
+            avail_ov_ids.add(ov.ID);
+        }
+    }
     
     // 3. Clear existing selections and assign filtered choices
     input.Control_Unit = null;
     input.Overlay_Asset = null;
-    input.Control_Unit:ui.add(cu_devices);
-    input.Overlay_Asset:ui.add(ov_devices);
+    input.Control_Unit:ui.add(avail_cu_ids);
+    input.Overlay_Asset:ui.add(avail_ov_ids);
     
     // 4. Enable hardware lookups
     enable Control_Unit;
     enable Overlay_Asset;
     
     // 5. Inventory check notice
-    if(cu_devices.size() == 0 || ov_devices.size() == 0)
+    if(avail_cu_ids.size() == 0 || avail_ov_ids.size() == 0)
     {
-        alert "Inventory Notice:\n\nCustomer '" + cust_name + "' currently has " + cu_devices.size() + " Control Unit(s) and " + ov_devices.size() + " Overlay(s) at their site.\n\nPlease verify that a Stock Transfer ('Office to Customer') has been completed to deliver devices to this customer.";
+        alert "Inventory Notice:\n\nCustomer '" + cust_name + "' has " + avail_cu_ids.size() + " available Control Unit(s) and " + avail_ov_ids.size() + " available Overlay(s) at their site.\n\nPlease verify that a Stock Transfer ('Office to Customer') has been completed to deliver spare devices to this customer.";
     }
 }
 else
@@ -67,17 +90,6 @@ else
     // Customer cleared: Reset hardware selections and lock
     input.Control_Unit = null;
     input.Overlay_Asset = null;
-    input.Control_Unit:ui.add(list());
-    input.Overlay_Asset:ui.add(list());
     disable Control_Unit;
     disable Overlay_Asset;
-    
-    if(input.Bed_Label != null && input.Bed_Label.trim() != "")
-    {
-        input.Bed_Station_Title = input.Bed_Label.trim();
-    }
-    else
-    {
-        input.Bed_Station_Title = "";
-    }
 }
