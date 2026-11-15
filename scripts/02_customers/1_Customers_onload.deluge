@@ -3,28 +3,28 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/02_customers/1_Customers_onload.deluge
-// Fields Used  : [Customer_Name, Customer_ID, Customer_Type, Billing_Address, Customer_Status]
+// Fields Used  : [Customer_Name, Customer_ID, Customer_Type, Billing_Address]
 // Cross-Forms  : None (Integrates with Zoho Books API)
-// Purpose      : Intelligent Form UX: In Add mode, Customer Name is the user entry
-//                field. Customer ID, Customer Type, and Billing Address are disabled
-//                to provide visual context without user editing. Customer Status is
-//                hidden during creation. Fetches active Books contacts to populate
-//                Customer Name choices. In Edit mode, locks customer identity.
+// Purpose      : Intelligent Form UX: In Add mode, Customer Name is the single
+//                user entry field. Customer ID is hidden (internal Books Contact ID
+//                for API invoicing). Customer Type and Billing Address are disabled
+//                to provide visual context without user editing. Fetches active Books
+//                contacts to populate Customer Name choices. In Edit mode, locks
+//                customer identity.
 // Optimization : Native Zoho Books integration call. Minimal statement footprint.
 // ==============================================================================
 
-// 1. Context Fields: Disabled so user sees auto-populated Books profile data without editing
+// 1. Background System Field: Hidden on form (Books Contact ID for API invoicing, zero UI clutter)
+hide Customer_ID;
 disable Customer_ID;
+
+// 2. Context Fields: Disabled so user sees auto-populated Books profile data without editing
 disable Customer_Type;
 disable Billing_Address;
 
 if(input.ID == null)
 {
-    // 2. ADD Mode: Hide status field on new intake
-    hide Customer_Status;
-    
     // Ensure context fields are visible
-    show Customer_ID;
     show Customer_Type;
     show Billing_Address;
     
@@ -32,7 +32,7 @@ if(input.ID == null)
     enable Customer_Name;
     show Customer_Name;
     
-    // 3. Fetch active customers from Zoho Books via native integration
+    // 2. Fetch active customers from Zoho Books via native integration
     org_id = "";
     org_resp = zoho.books.getOrganizations();
     if(org_resp != null && org_resp.get("code") == 0)
@@ -75,8 +75,6 @@ if(input.ID == null)
 }
 else
 {
-    // 4. EDIT Mode: Customer record is immutable once created
+    // 3. EDIT Mode: Customer record is immutable once created
     disable Customer_Name;
-    disable Customer_Status;
-    show Customer_Status;
 }

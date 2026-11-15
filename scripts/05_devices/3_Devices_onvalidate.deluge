@@ -3,10 +3,10 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/05_devices/3_Devices_onvalidate.deluge
-// Fields Used  : [Serial_Number, Lot_Number, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Office]
+// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Office]
 // Cross-Forms  : [Devices, Product_Model, Offices]
 // Purpose      : Comprehensive validation and data integrity engine for device intake:
-//                1. Validates mandatory Serial Number and Lot Number.
+//                1. Validates mandatory Serial Number and Lot.
 //                2. Enforces unique Serial Number (duplicate guard).
 //                3. Validates hardware serial syntax (must contain CU or OV;
 //                   must begin with recognized prefix ALT4, ALT8, ETO, ETOF).
@@ -24,10 +24,10 @@ if(input.Serial_Number == null || input.Serial_Number.trim() == "")
     cancel submit;
 }
 
-// 2. Mandatory Check: Lot Number
-if(input.Lot_Number == null)
+// 2. Mandatory Check: Lot
+if(input.Lot == null)
 {
-    alert "Mandatory Field Missing:\n\nPlease select the manufacturing Lot Number.";
+    alert "Mandatory Field Missing:\n\nPlease select the manufacturing Lot.";
     cancel submit;
 }
 

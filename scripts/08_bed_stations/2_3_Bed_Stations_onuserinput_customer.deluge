@@ -21,17 +21,50 @@ if(input.Customer != null)
     cust_id = input.Customer;
     cust_rec = Customers[ID == cust_id];
     cust_name = "";
+    clean_cust = "";
     if(cust_rec.count() > 0)
     {
-        cust_name = ifnull(cust_rec.Customer_Name, "");
+        cust_raw = ifnull(cust_rec.Customer_Name, "");
+        cust_name = cust_raw;
+        
+        clean_cust = cust_raw;
+        clean_cust = clean_cust.replaceAll(" Private Limited", "");
+        clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
+        clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
+        clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
+        clean_cust = clean_cust.replaceAll(" Limited", "");
+        clean_cust = clean_cust.replaceAll(" Ltd.", "");
+        clean_cust = clean_cust.replaceAll(" Ltd", "");
+        clean_cust = clean_cust.replaceAll(" & Research Centre", "");
+        clean_cust = clean_cust.replaceAll(" and Research Centre", "");
+        clean_cust = clean_cust.replaceAll(" & Research Center", "");
+        clean_cust = clean_cust.replaceAll(" and Research Center", "");
+        clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Multispeciality", "");
+        clean_cust = clean_cust.replaceAll(" Multispecialty", "");
+        clean_cust = clean_cust.replaceAll(" Superspeciality", "");
+        clean_cust = clean_cust.replaceAll(" Super Speciality", "");
+        clean_cust = clean_cust.trim();
+        
+        if(clean_cust.length() > 30)
+        {
+            c_words = clean_cust.toList(" ");
+            if(c_words.size() > 3)
+            {
+                clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+            }
+        }
     }
     
-    // 1. Pre-fill Bed Station Title if empty
+    // 1. Pre-fill Bed Station Title if empty (Clean Customer - Bed)
     if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
     {
-        if(cust_name != "")
+        if(clean_cust != "")
         {
-            input.Bed_Station_Title = cust_name;
+            input.Bed_Station_Title = clean_cust + " - Bed";
         }
     }
     

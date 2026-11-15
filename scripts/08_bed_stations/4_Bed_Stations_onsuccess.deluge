@@ -4,14 +4,14 @@
 // Trigger Hook : Created or Edited -> Form Actions -> On Success
 // File Path    : scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge
 // Fields Used  : [Deployment_Type, Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date, Bed_Station_ID, Bed_Station_Title]
-// Cross-Forms  : [Devices, Rental_Agreements, Bed_Station_Logs, Bed_Stations]
+// Cross-Forms  : [Devices, Bed_Stations]
 // Purpose      : Executes synchronized downstream updates on form submission:
 //                1. Updates physical hardware custody and Rental State in Devices.
-//                2. Synchronizes active station count on Rental Agreement (if Rental).
-//                3. Records active pairing interval in Bed_Station_Logs (supports
-//                   both Rental and Trial deployments with null-safe contract link).
-//                4. Appends system-generated Bed_Station_ID to Bed_Station_Title.
-// Optimization : Atomic updates with targeted criteria. Clean procedural Deluge.
+//                2. Reconciles bedside hardware swaps: marks newly coupled units Active
+//                   and safely resets any replaced/unassigned buffer units to Inactive.
+//                3. Appends system-generated Bed_Station_ID to Bed_Station_Title.
+//                4. Navigates cleanly to the 'All_Bed_Stations' report view.
+// Optimization : Atomic updates with targeted criteria outside brackets. Law 1 compliant.
 // ==============================================================================
 
 current_station_id = input.ID;
@@ -53,49 +53,32 @@ if(input.Overlay_Asset != null)
     }
 }
 
-// 2. Maintain Historical Timeline in Bed Station Logs (Interval Ledger)
-if(input.Deployment_Status == "Active")
+// 2. Hardware Swap Reconciliation (Self-Healing)
+// If a device was swapped out during an edit, reset its Rental State to Inactive
+if(input.Customer != null)
 {
-    // Check if an active interval already exists for this bed station
-    existing_active_log = Bed_Station_Logs[Bed_Station == current_station_id && Period_End_Date == null];
-    if(existing_active_log.count() == 0)
+    cust_id = input.Customer;
+    status_active = "Active";
+    
+    // Fetch all currently active devices at this customer facility
+    cust_active_devices = Devices[Current_Customer == cust_id && Rental_State == status_active];
+    
+    // Fetch all hardware IDs actively assigned to ANY active bed station at this customer site
+    active_station_cu_ids = Bed_Stations[Customer == cust_id && Deployment_Status == status_active].Control_Unit.getAll();
+    active_station_ov_ids = Bed_Stations[Customer == cust_id && Deployment_Status == status_active].Overlay_Asset.getAll();
+    
+    // Reconcile: If a device is marked Active but no longer deployed on any active bed station, revert to Inactive
+    for each d in cust_active_devices
     {
-        start_date = ifnull(input.Deployment_Start_Date, zoho.currenttime);
-        
-        insert into Bed_Station_Logs
-        [
-            Bed_Station = current_station_id
-            Customer = input.Customer
-            Rental_Agreement = input.Rental_Agreement
-            Control_Unit = input.Control_Unit
-            Overlay = input.Overlay_Asset
-            Period_Start_Date = start_date
-        ]
-    }
-}
-else if(input.Deployment_Status == "Closed")
-{
-    // Close any active pairing logs when the Bed Station is decommissioned
-    active_logs = Bed_Station_Logs[Bed_Station == current_station_id && Period_End_Date == null];
-    for each log in active_logs
-    {
-        close_ts = ifnull(input.Deployment_End_Date, zoho.currenttime);
-        log.Period_End_Date = close_ts;
-        
-        // Calculate operating duration in days (Number / BIGINT)
-        if(log.Period_Start_Date != null)
+        d_id = d.ID;
+        if(!active_station_cu_ids.contains(d_id) && !active_station_ov_ids.contains(d_id))
         {
-            duration_days = log.Period_Start_Date.daysBetween(close_ts);
-            if(duration_days <= 0)
-            {
-                duration_days = 1;
-            }
-            log.Duration_Days = duration_days.toLong();
+            d.Rental_State = "Inactive";
         }
     }
 }
 
-// 4. Ensure Bed Station Title includes generated Bed Station ID
+// 3. Ensure Bed Station Title includes generated Bed Station ID (e.g. #BST-0001)
 if(input.Bed_Station_ID != null)
 {
     bst_rec = Bed_Stations[ID == current_station_id];
@@ -105,7 +88,10 @@ if(input.Bed_Station_ID != null)
         bst_id_str = input.Bed_Station_ID.toString();
         if(curr_title != "" && !curr_title.contains(bst_id_str))
         {
-            bst_rec.Bed_Station_Title = curr_title + " (" + bst_id_str + ")";
+            bst_rec.Bed_Station_Title = curr_title + " #" + bst_id_str;
         }
     }
 }
+
+// 4. Redirect cleanly to the All_Bed_Stations report view
+openUrl("#Report:All_Bed_Stations", "same window");

@@ -14,7 +14,6 @@ This document defines the permanent collaboration protocol, design standards, De
      - **Approvals** (for managerial overrides, commercial waivers, write-offs)
      - **Schedules & Batch Workflows** (for daily billing, automated ledger rollups)
      - **Functions / Standalone Deluge** (for reusable business logic)
-     - **Stateless Wizards** (for guided bedside actions, swaps, multi-bed handovers)
    - Every workflow is designed to prevent hitting Deluge execution statement limits (5,000 statements/run) and optimize Zoho One subscription quotas.
 
 2. **Schema & Field Finalization**:
@@ -26,7 +25,6 @@ This document defines the permanent collaboration protocol, design standards, De
      - `docs/ARCHITECTURE.md`: System overview, product lifecycles, Books integration, and roles.
      - `docs/DATA_DICTIONARY.md`: **The Master Dependency Matrix**. Maps every field, link name, type, and cross-module reference. Checked and updated on every schema or workflow change.
      - `docs/modules/<xx_module>.md`: Dedicated specification file for each individual module.
-     - `docs/wizards/<wizard_name>.md`: Detailed specs for stateless popup modals.
    - **NO inline Deluge script blocks in module plan files.** All business logic must be stated in **plain English** and reference the exact file path of the corresponding script in `scripts/`.
    - **NO premature Reports, Views, or UI designs in plan files.** Deferred until forms, relationships, and workflows are completely built and tested.
    - When schemas or workflows change during iterative discussion, the module file and `DATA_DICTIONARY.md` are immediately refactored to remain 100% accurate.
@@ -46,15 +44,13 @@ scripts/
 ├── 01_lots/
 ├── 02_customers/
 ├── 03_offices/
-├── 04_product_catalog/
+├── 04_rental_items/
 ├── 05_devices/
 ├── 06_rental_agreements/
 ├── 07_stock_transfers/
 ├── 08_bed_stations/
-├── 09_bed_station_logs/
-├── 10_rental_log/
-├── 11_qc_sanitization/
-├── wizards/
+├── 10_rental_logs/
+├── product_models/
 └── functions/
 ```
 
@@ -172,6 +168,8 @@ These rules are permanent and mandatory across all scripts in this project to pr
    - `input.Added_Time` and `input.Modified_Time` are not accessible on `input` in form workflows. Use `zoho.currentdate` / `zoho.currenttime`.
 4. **Single-Line Comments Only**:
    - Always use `//` for comments in form workflows. Never use multi-line `/* ... */` blocks in workflow scripts to prevent line offset misreporting in the Creator compiler.
+5. **NO UI Commands (`show`, `hide`, `disable`, `enable`) on Auto-Number or Formula Fields**:
+   - Auto-Number and Formula fields are system-managed fields. Calling `show`, `hide`, `disable`, or `enable` crashes the Deluge compiler with: `'<action>' function cannot be applied for '<Field_Name>'`. Auto-number fields are managed purely by Creator layout properties and cannot be targeted by script UI tasks.
 
 ---
 
@@ -185,8 +183,6 @@ To guarantee high performance and avoid quota/statement bottlenecks:
    - Use Zoho Creator's native field formulas, default values, and lookup conditional filters where possible before falling back to Deluge script.
 3. **Use Blueprints for Life Cycles**:
    - For multi-stage assets, orders, or transfers, use Zoho Creator Blueprints to define states, transitions, required transition fields, and validation rather than writing complex custom stage validation scripts.
-4. **Stateless Forms for Complex Multi-Step Tasks**:
-   - Use stateless forms for user-facing interactive actions (component swaps, delivery handovers, bulk month log generation). This keeps operational databases clean and avoids storing abandoned draft records.
 
 ---
 
@@ -205,7 +201,7 @@ Before writing or modifying any workflow code:
 
 ## 6. Pre-Flight Code Quality Checklist
 
-Antigravity must mentally and statically verify every script against this 7-point checklist before delivering code:
+Antigravity must mentally and statically verify every script against this 8-point checklist before delivering code:
 
 | # | Check | Rule |
 | :--- | :--- | :--- |
@@ -216,3 +212,4 @@ Antigravity must mentally and statically verify every script against this 7-poin
 | 5 | **Workflow Boundaries** | No `try-catch`, no `return;`, no `input.Added_Time`, no capital `List()`. |
 | 6 | **Comment Format** | Single-line `//` comments only. |
 | 7 | **Schema Link Parity** | 100% match with verified Link Names in `DATA_DICTIONARY.md`. |
+| 8 | **Auto-Number / Formula Field Guard** | Never call `show`, `hide`, `disable`, or `enable` on Auto-Number or Formula fields (`'<action>' function cannot be applied`). |

@@ -3,13 +3,12 @@
 // Script Type  : Form Workflow (On Success)
 // Trigger Hook : Created -> Form Actions -> On Success
 // File Path    : scripts/05_devices/4_Devices_onsuccess.deluge
-// Fields Used  : []
-// Cross-Forms  : []
-// Purpose      : Handles successful device record creation. Relies on native Zoho Creator
-//                submission handling to prevent infinite loading spinners on modal forms.
-// Optimization : 0 database queries consumed.
+// Fields Used  : None
+// Cross-Forms  : None
+// Purpose      : Navigates cleanly to the 'All_Devices' report upon successful
+//                record creation, returning the user to the master hardware register.
+// Optimization : Zero database queries consumed.
 // ==============================================================================
 
-// Record successfully saved.
-// Note: Client-side openUrl is omitted to prevent modal submission hanging.
-// Configure post-submission navigation natively in Form Properties -> On Successful Submission.
+// 1. Redirect cleanly to the All_Devices report view
+openUrl("#Report:All_Devices", "same window");

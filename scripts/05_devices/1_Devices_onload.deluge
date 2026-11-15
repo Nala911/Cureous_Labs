@@ -3,9 +3,9 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/05_devices/1_Devices_onload.deluge
-// Fields Used  : [Serial_Number, Lot_Number, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office, Current_Customer]
+// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office, Current_Customer]
 // Cross-Forms  : None
-// Purpose      : In Add mode: Enables Serial_Number and Lot_Number; keeps Device_Type
+// Purpose      : In Add mode: Enables Serial_Number and Lot; keeps Device_Type
 //                and Product_Model disabled for visual context; hides custody and
 //                lifecycle fields.
 //                In Edit mode: Locks identity fields; enables Device_Stage and
@@ -16,11 +16,11 @@
 
 if(input.ID == null)
 {
-    // 1. ADD Mode: Only Serial Number & Lot Number are user interactive
+    // 1. ADD Mode: Only Serial Number & Lot are user interactive
     enable Serial_Number;
-    enable Lot_Number;
+    enable Lot;
     show Serial_Number;
-    show Lot_Number;
+    show Lot;
     
     // 2. Context Fields: Disabled so user sees hardware classification without editing
     disable Device_Type;
@@ -37,9 +37,9 @@ if(input.ID == null)
 }
 else
 {
-    // 4. EDIT Mode: Serial Number and Lot Number are immutable
+    // 4. EDIT Mode: Serial Number and Lot are immutable
     disable Serial_Number;
-    disable Lot_Number;
+    disable Lot;
     
     // Context and custody fields remain locked
     disable Rental_State;

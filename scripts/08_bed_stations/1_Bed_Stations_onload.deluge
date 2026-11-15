@@ -3,14 +3,16 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/08_bed_stations/1_Bed_Stations_onload.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Rental_Item, Deployment_End_Date]
-// Cross-Forms  : None
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Deployment_End_Date]
+// Cross-Forms  : [Bed_Stations, Devices]
 // Purpose      : Configures dynamic UI visibility and field states based on Add vs Edit
 //                mode. In Add mode, defaults Deployment_Type to "Rental", enables
 //                interactive fields, disables context fields, and defaults start date
-//                and status. In Edit mode, locks contract, customer, mode, and hardware
-//                lookups to protect bedside custody integrity.
-// Optimization : Zero database queries consumed. Runs in <5ms.
+//                and status. In Edit mode, locks contract, customer, mode, and closure
+//                fields. If Deployment_Status == "Active", enables Control Unit and
+//                Overlay lookups for native bedside hardware swapping, loading customer
+//                buffer inventory plus currently coupled units. If Closed, locks lookups.
+// Optimization : Targeted indexed query outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
 if(input.ID == null)
@@ -46,28 +48,21 @@ if(input.ID == null)
     enable Deployment_Start_Date;
     show Deployment_Start_Date;
     
-    // Deployment Status: Defaults to Active
+    // Deployment Status: Defaults to Active (Hidden on Add to prevent accidental status conflicts)
     input.Deployment_Status = "Active";
-    enable Deployment_Status;
-    show Deployment_Status;
+    hide Deployment_Status;
     
-    // Derived Context Fields: Disabled on Add
-    disable Rental_Item;
-    show Rental_Item;
-    
+    // Deployment End Date: Hidden on Add (stamped on de-installation/closure in Edit mode)
+    hide Deployment_End_Date;
     disable Deployment_End_Date;
-    show Deployment_End_Date;
     input.Deployment_End_Date = null;
 }
 else
 {
-    // 2. EDIT Mode: Lock Contract, Customer, Hardware Pairings, and Context Fields
+    // 2. EDIT Mode: Lock Contract, Customer, and Closure Date Fields
     disable Deployment_Type;
     disable Rental_Agreement;
     disable Customer;
-    disable Rental_Item;
-    disable Control_Unit;
-    disable Overlay_Asset;
     disable Deployment_End_Date;
     
     // Conditional display of Rental Agreement in Edit mode based on Deployment Type
@@ -87,11 +82,62 @@ else
     
     show Deployment_Type;
     show Customer;
-    show Rental_Item;
     show Control_Unit;
     show Overlay_Asset;
     show Bed_Station_Title;
     show Deployment_Status;
     show Deployment_Start_Date;
     show Deployment_End_Date;
+    
+    // Native Bedside Swapping: If station is Active, enable hardware lookups and populate available choices
+    if(input.Deployment_Status == "Active")
+    {
+        enable Control_Unit;
+        enable Overlay_Asset;
+        
+        if(input.Customer != null)
+        {
+            cust_id = input.Customer;
+            curr_id = input.ID;
+            status_val = "Active";
+            
+            // Collect hardware IDs already deployed on OTHER active bed stations at this facility
+            active_cu_ids = Bed_Stations[Customer == cust_id && Deployment_Status == status_val && ID != curr_id].Control_Unit.getAll();
+            active_ov_ids = Bed_Stations[Customer == cust_id && Deployment_Status == status_val && ID != curr_id].Overlay_Asset.getAll();
+            
+            // Query all hardware physically at this customer site
+            cu_type = "Control Unit";
+            ov_type = "Overlay";
+            all_cu_recs = Devices[Current_Customer == cust_id && Device_Type == cu_type];
+            all_ov_recs = Devices[Current_Customer == cust_id && Device_Type == ov_type];
+            
+            // Build available lists (buffer units + currently coupled units)
+            avail_cu_ids = list();
+            for each cu in all_cu_recs
+            {
+                if(!active_cu_ids.contains(cu.ID))
+                {
+                    avail_cu_ids.add(cu.ID);
+                }
+            }
+            
+            avail_ov_ids = list();
+            for each ov in all_ov_recs
+            {
+                if(!active_ov_ids.contains(ov.ID))
+                {
+                    avail_ov_ids.add(ov.ID);
+                }
+            }
+            
+            input.Control_Unit:ui.add(avail_cu_ids);
+            input.Overlay_Asset:ui.add(avail_ov_ids);
+        }
+    }
+    else
+    {
+        // When Closed or Inactive, lock hardware pairings
+        disable Control_Unit;
+        disable Overlay_Asset;
+    }
 }

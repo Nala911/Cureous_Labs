@@ -2,20 +2,28 @@
 // Module Name  : Bed Stations (Form Link Name: Bed_Stations)
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Deployment_Status -> On User Input
-// File Path    : scripts/08_bed_stations/2_6_Bed_Stations_onuserinput_deploymentstatus.deluge
-// Fields Used  : [Deployment_Status, Deployment_End_Date]
+// File Path    : scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_deploymentstatus.deluge
+// Fields Used  : [Deployment_Status, Deployment_End_Date, Control_Unit, Overlay_Asset]
 // Cross-Forms  : None
 // Purpose      : When Deployment Status is transitioned to "Closed", automatically
-//                sets Deployment End Date to the current timestamp. Clears End Date
-//                if reverted back to "Active" or "Inactive".
+//                sets Deployment End Date to current timestamp and locks hardware
+//                lookups. Clears End Date and re-enables hardware lookups in Edit
+//                mode if reverted back to "Active".
 // Optimization : Zero database queries. Runs in <2ms.
 // ==============================================================================
 
 if(input.Deployment_Status == "Closed")
 {
     input.Deployment_End_Date = zoho.currenttime;
+    disable Control_Unit;
+    disable Overlay_Asset;
 }
 else
 {
     input.Deployment_End_Date = null;
+    if(input.ID != null)
+    {
+        enable Control_Unit;
+        enable Overlay_Asset;
+    }
 }

@@ -28,8 +28,8 @@
 1. **Serial Number** `[Single Line]` (Mandatory, Unique, Primary Key, Barcode/QR capable)
    - Field Link Name: `Serial_Number`
    - Form Behavior: Visible & Enabled on Add; Locked in Edit mode.
-2. **Lot Number** `[Lookup -> Lots, displaying Lot_ID]` (Mandatory parent lot traceability)
-   - Field Link Name: `Lot_Number`
+2. **Lot** `[Lookup -> Lots, displaying Lot_ID]` (Mandatory parent lot traceability)
+   - Field Link Name: `Lot`
    - Form Behavior: Visible & Enabled on Add (auto-filled with latest lot on serial number entry, editable by user); Locked in Edit mode.
 
 ### B. Auto-Derived Context Fields (Disabled - Provide Visual Context without Editing):
@@ -91,21 +91,21 @@
 - **File**: `scripts/05_devices/1_Devices_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable `Serial_Number` and `Lot_Number` as the only user interactive fields. Keep `Device_Type` and `Product_Model` disabled to provide clear context without user editing. Hide custody and lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Rental_State`, `Current_Custody`).
-  - In EDIT Mode: Lock `Serial_Number` and `Lot_Number`. Display and lock all context and custody fields (`Rental_State`, `Current_Custody`, `Device_Type`, `Product_Model`, `Current_Office`, `Current_Customer`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and populating only the relevant stages for that hardware (`Control Unit` vs `Overlay`), re-asserting the current saved stage, and enabling `Device_Stage` for progressive stage updates.
+  - In ADD Mode: Enable `Serial_Number` and `Lot` as the only user interactive fields. Keep `Device_Type` and `Product_Model` disabled to provide clear context without user editing. Hide custody and lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Rental_State`, `Current_Custody`).
+  - In EDIT Mode: Lock `Serial_Number` and `Lot`. Display and lock all context and custody fields (`Rental_State`, `Current_Custody`, `Device_Type`, `Product_Model`, `Current_Office`, `Current_Customer`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and populating only the relevant stages for that hardware (`Control Unit` vs `Overlay`), re-asserting the current saved stage, and enabling `Device_Stage` for progressive stage updates.
 
 ### Workflow 2: On User Input (Step 1: Serial Number)
 - **File**: `scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Serial_Number -> On User Input
 - **Plain English Logic**:
-  - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Rental_State`, `Current_Custody`, `Current_Office`, `Lot_Number`).
+  - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Rental_State`, `Current_Custody`, `Current_Office`, `Lot`).
   - Step 2: Duplicate check: Check if `Serial_Number` exists in `Devices`. If found, alert user and clear field.
   - Step 3: Detect `Device_Type`: If contains `"CU"` -> `"Control Unit"`; if `"OV"` -> `"Overlay"`; else alert and clear.
   - Step 4: Auto-initialize `Device_Stage`: If Control Unit -> `"0 - CU Mfg Not Yet Started"`; if Overlay -> `"0 - OV Mfg Not Yet Started"`.
   - Step 5: Detect `Product_Model`: Matches serial prefix to determine target model (`Altern4`, `Altern8`, `EturnalOne`, `Eturnal One with foam`), queries `Product_Model` and assigns lookup ID; else alerts and clears.
   - Step 6: Initialize `Rental_State = "Inactive"` and leave `Current_Custody = null` (blank on intake; stamped on first transfer).
   - Step 7: Query `Offices` where `Is_Primary == true` and auto-populate `Current_Office` with the Primary Hub.
-  - Step 8: Auto-populate `Lot_Number` with the latest manufacturing lot from `Lots` (using optimized query `sort by Added_Time desc range from 1 to 1`), while keeping `Lot_Number` fully enabled so the technician can manually change the lot if required.
+  - Step 8: Auto-populate `Lot` with the latest manufacturing lot from `Lots` (using optimized query `sort by Added_Time desc range from 1 to 1`), while keeping `Lot` fully enabled so the technician can manually change the lot if required.
 
 ### Workflow 2.2: On Update of Device Stage (Auto-Harmonization Guard)
 - **File**: `scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge`
@@ -120,7 +120,7 @@
 - **File**: `scripts/05_devices/3_Devices_onvalidate.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Validate
 - **Plain English Logic**:
-  - Step 1: Mandatory check: Ensure `Serial_Number` is entered and `Lot_Number` is selected.
+  - Step 1: Mandatory check: Ensure `Serial_Number` is entered and `Lot` is selected.
   - Step 2: Sanitize `Serial_Number` (trim & uppercase).
   - Step 3: Duplicate check: Query `Devices` to prevent duplicate serial numbers.
   - Step 4: Verify syntax: Serial number must contain "CU" or "OV", and begin with valid prefix.
@@ -131,4 +131,4 @@
 - **File**: `scripts/05_devices/4_Devices_onsuccess.deluge`
 - **Trigger**: Created -> Form Actions -> On Success
 - **Plain English Logic**:
-  - Step 1: Record successfully saved. Relies on Zoho Creator native form properties for post-submission handling (avoiding client-side modal loader lockups).
+  - Step 1: Redirect cleanly to `All_Devices` report view (`openUrl("#Report:All_Devices", "same window");`), returning user to master asset register.

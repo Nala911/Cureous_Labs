@@ -7,7 +7,9 @@
 
 ---
 
-## 1. Commercial Rental Modes Supported
+## 1. Unified Usage & Billing Timeline Ledger
+
+`Rental_Logs` serves as the single authoritative operational and commercial ledger across all customer bed stations:
 
 ### 1. Pay-Per-Use (Daily):
 - Operator selects `Bed_Station`; system auto-fetches linked active Control Unit, Overlay, and Daily Agreed Rate.
@@ -17,11 +19,13 @@
   - `Taxable_Value = Number_of_Days * Agreed_Rate`
   - `GST_Amount` = Native Formula (`Taxable_Value * 0.05`)
   - `Invoice_Amount` = Native Formula (`Taxable_Value + GST_Amount`)
+- **Mid-Month Hardware Swaps**: If a component (e.g. Control Unit) was replaced during the month, staff records separate entries for each device-pairing interval (e.g. Jan 1–14 with CU-01, Jan 15–31 with replacement CU-02). This provides complete, audit-proof clinical tracking and exact billing line items.
 
 ### 2. Fixed Monthly Rental:
-- Generated for bed stations under a monthly recurring agreement.
+- Generated at month-end for bed stations under a monthly recurring agreement.
 - Attaches the assigned Bed Station, active Control Unit, and Overlay device lookups.
-- Computes flat monthly fee:
+- Operator enters billing period (e.g., 1st to end of month).
+- Computes flat monthly fee regardless of days:
   - `Taxable_Value = Agreed_Rate`
   - `GST_Amount` = Native Formula (`Taxable_Value * 0.05`)
   - `Invoice_Amount` = Native Formula (`Taxable_Value + GST_Amount`)
@@ -71,7 +75,7 @@
 12. **Billing Status** `[Dropdown]`
     - Field Link Name: `Billing_Status`
     - Options: `"Pending Invoice"`, `"Invoiced"`, `"Cancelled / Void"` (Default: `"Pending Invoice"`)
-    - Form Behavior: Visible & Disabled on Add (system-managed; locked to `"Pending Invoice"` on initial creation).
+    - Form Behavior: Hidden on Add (defaults to `"Pending Invoice"`); Visible & Disabled in Edit mode.
 
 ---
 
@@ -81,8 +85,8 @@
 - **File**: `scripts/10_rental_logs/1_Rental_Logs_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable interactive user entry fields (`Bed_Station`, `Control_Unit`, `Overlay`, `Usage_Start_Date`, `Usage_End_Date`, `Agreed_Rate`, `Number_of_Days`). Disable `Taxable_Value` and `Billing_Status`. Initialize default `Billing_Status = "Pending Invoice"`. (Note: `GST_Amount` and `Invoice_Amount` are native formula fields and are automatically read-only).
-  - In EDIT Mode: Lock `Bed_Station`, `Taxable_Value`, and `Billing_Status`. If `Billing_Status == "Pending Invoice"`, allow adjustments to dates, rate, duration, and hardware lookups.
+  - In ADD Mode: Enable interactive user entry fields (`Bed_Station`, `Control_Unit`, `Overlay`, `Usage_Start_Date`, `Usage_End_Date`, `Agreed_Rate`, `Number_of_Days`). Disable `Taxable_Value`. Hide `Billing_Status` and initialize default `Billing_Status = "Pending Invoice"`. (Note: `GST_Amount` and `Invoice_Amount` are native formula fields and are automatically read-only).
+  - In EDIT Mode: Show and lock `Billing_Status`. Lock `Bed_Station` and `Taxable_Value`. If `Billing_Status == "Pending Invoice"`, allow adjustments to dates, rate, duration, and hardware lookups.
 
 ### Workflow 2: On User Input of Bed Station
 - **File**: `scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge`

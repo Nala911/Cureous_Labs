@@ -8,10 +8,14 @@
 // Purpose      : Enforces mandatory inputs, validates chronological dates and positive rates,
 //                guards against overlapping billing intervals for the same bed station, and
 //                ensures mathematical integrity of taxable base calculation.
-// Optimization : Single criteria guard query with indexed variables. Zero try-catch blocks.
+// Optimization : Single criteria guard query with indexed variables. Zero try-catch blocks. Law 1 compliant.
 // ==============================================================================
 
-curr_id = input.ID;
+curr_id = 0;
+if(input.ID != null)
+{
+    curr_id = input.ID;
+}
 
 // 1. Mandatory Field Validations
 if(input.Bed_Station == null)
@@ -62,15 +66,9 @@ if(input.Agreed_Rate == null || input.Agreed_Rate <= 0)
 target_bed_id = input.Bed_Station;
 target_start = input.Usage_Start_Date;
 target_end = input.Usage_End_Date;
+void_status = "Cancelled / Void";
 
-if(curr_id != null)
-{
-    overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date <= target_end && Usage_End_Date >= target_start && Billing_Status != "Cancelled / Void" && ID != curr_id];
-}
-else
-{
-    overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date <= target_end && Usage_End_Date >= target_start && Billing_Status != "Cancelled / Void"];
-}
+overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date <= target_end && Usage_End_Date >= target_start && Billing_Status != void_status && ID != curr_id];
 
 if(overlapping_logs.count() > 0)
 {

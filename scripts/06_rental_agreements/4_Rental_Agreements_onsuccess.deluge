@@ -5,14 +5,14 @@
 // File Path    : scripts/06_rental_agreements/4_Rental_Agreements_onsuccess.deluge
 // Fields Used  : [Rental_Agreement_ID, Agreement_Title]
 // Cross-Forms  : [Rental_Agreements]
-// Purpose      : 1. Appends system-generated Rental_Agreement_ID to Agreement_Title.
+// Purpose      : 1. Appends system-generated Rental_Agreement_ID as ' #ID' to Agreement_Title.
 //                2. Navigates cleanly to the 'All_Rental_Agreements' report.
-// Optimization : Single atomic update by ID.
+// Optimization : Single atomic update by ID. Law 1 compliant.
 // ==============================================================================
 
 current_agr_id = input.ID;
 
-// 1. Ensure Agreement Title includes generated Rental Agreement ID
+// 1. Ensure Agreement Title includes generated Rental Agreement ID (e.g. #2)
 if(input.Rental_Agreement_ID != null)
 {
     agr_rec = Rental_Agreements[ID == current_agr_id];
@@ -22,7 +22,7 @@ if(input.Rental_Agreement_ID != null)
         agr_id_str = input.Rental_Agreement_ID.toString();
         if(curr_title != "" && !curr_title.contains(agr_id_str))
         {
-            agr_rec.Agreement_Title = curr_title + " (" + agr_id_str + ")";
+            agr_rec.Agreement_Title = curr_title + " #" + agr_id_str;
         }
     }
 }

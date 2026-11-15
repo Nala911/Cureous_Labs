@@ -3,7 +3,7 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Deployment_Type -> On User Input
 // File Path    : scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Control_Unit, Overlay_Asset, Rental_Item, Bed_Station_Title]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Control_Unit, Overlay_Asset, Bed_Station_Title]
 // Cross-Forms  : None
 // Purpose      : Dynamically adjusts form fields when user switches between "Rental"
 //                and "For Trial". For Rental, activates Rental Agreement lookup and
@@ -24,9 +24,6 @@ if(input.Deployment_Type == "Rental")
     disable Customer;
     input.Customer = null;
     
-    // Clear rental item
-    input.Rental_Item = "";
-    
     // Reset and disable hardware lookups until an agreement is selected
     input.Control_Unit = null;
     input.Overlay_Asset = null;
@@ -45,9 +42,6 @@ else if(input.Deployment_Type == "For Trial")
     show Customer;
     enable Customer;
     input.Customer = null;
-    
-    // Clear rental item
-    input.Rental_Item = "";
     
     // Reset and disable hardware lookups until a customer is selected
     input.Control_Unit = null;

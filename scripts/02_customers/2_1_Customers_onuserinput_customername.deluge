@@ -3,12 +3,12 @@
 // Script Type  : Field Workflow (On User Input)
 // Trigger Hook : Field Actions -> Customer_Name -> On User Input
 // File Path    : scripts/02_customers/2_1_Customers_onuserinput_customername.deluge
-// Fields Used  : [Customer_Name, Customer_ID, Customer_Type, Billing_Address, Customer_Status]
+// Fields Used  : [Customer_Name, Customer_ID, Customer_Type, Billing_Address]
 // Cross-Forms  : [Customers] (Integrates with Zoho Books API)
 // Purpose      : Validates selection, guards against duplicate entry, queries
 //                Zoho Books via native integration, and auto-populates Customer ID,
-//                Customer Type, formatted Multi-Line Billing Address with statutory
-//                GSTIN and operational Contact (Phone/Email), and Status.
+//                Customer Type, and formatted Multi-Line Billing Address with statutory
+//                GSTIN and operational Contact (Phone/Email).
 // Optimization : Uses targeted search_text query to avoid iterating 200 records.
 //                Zero try-catch and zero return statements per Deluge Compiler Laws.
 // ==============================================================================
@@ -23,10 +23,9 @@ if(input.Customer_Name != null && input.Customer_Name.trim() != "")
     if(existing_count > 0)
     {
         alert "Customer Already Onboarded:\n\n'" + target_name + "' is already registered in the system.\n\nPlease select an un-onboarded customer from the list.";
-        input.Customer_ID = "";
+        input.Customer_ID = null;
         input.Customer_Type = null;
         input.Billing_Address = "";
-        input.Customer_Status = null;
     }
     else
     {
@@ -64,7 +63,7 @@ if(input.Customer_Name != null && input.Customer_Name.trim() != "")
                 {
                     // A. Customer ID (Zoho Books Primary Key)
                     c_id = matched_contact.get("contact_id");
-                    input.Customer_ID = c_id.toString();
+                    input.Customer_ID = c_id.toLong();
                     
                     // B. Customer Type (Business vs Individual)
                     c_sub = matched_contact.get("customer_sub_type");
@@ -206,9 +205,6 @@ if(input.Customer_Name != null && input.Customer_Name.trim() != "")
                     }
                     
                     input.Billing_Address = b_text.trim();
-                    
-                    // D. Set Default Status
-                    input.Customer_Status = "Active";
                 }
             }
         }
@@ -217,8 +213,7 @@ if(input.Customer_Name != null && input.Customer_Name.trim() != "")
 else
 {
     // Selection cleared: Reset all dependent auto-derived fields
-    input.Customer_ID = "";
+    input.Customer_ID = null;
     input.Customer_Type = null;
     input.Billing_Address = "";
-    input.Customer_Status = null;
 }

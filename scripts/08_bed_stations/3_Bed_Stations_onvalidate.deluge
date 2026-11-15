@@ -3,20 +3,24 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Bed_Station_ID, Rental_Item, Deployment_End_Date]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Bed_Station_ID, Deployment_End_Date]
 // Cross-Forms  : [Rental_Agreements, Devices, Customers, Bed_Stations]
 // Purpose      : Comprehensive clinical, commercial, and operational validation:
 //                1. Validates mandatory fields based on Deployment_Type.
 //                2. Validates Bed_Station_Title is specified.
 //                3. Verifies hardware classification (CU pump vs Overlay mattress).
-//                4. Ensures selected hardware is physically located at Customer's site.
+//                4. Ensures selected hardware physically resides at Customer's site.
 //                5. Blocks duplicate active hardware assignment across all bed stations.
 //                6. Enforces strict 1-to-1 active station limit for Fixed Monthly contracts.
 //                7. Guarantees closure timestamp on decommission.
-// Optimization : Max 4 indexed queries. Zero try-catch blocks.
+// Optimization : Max 4 indexed queries. Zero try-catch blocks. Law 1 compliant.
 // ==============================================================================
 
-curr_id = input.ID;
+curr_id = 0;
+if(input.ID != null)
+{
+    curr_id = input.ID;
+}
 
 // 1. Mandatory Field Validations
 if(input.Deployment_Type == null || input.Deployment_Type == "")
@@ -44,8 +48,57 @@ else if(input.Deployment_Type == "For Trial")
 
 if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
 {
-    alert "Validation Error:\n\nPlease enter a Bed Station Title (e.g. 'Dhanya Ortho Clinic - ICU Bed 4').";
-    cancel submit;
+    if(input.Customer != null)
+    {
+        target_cust = input.Customer;
+        cust_rec = Customers[ID == target_cust];
+        cust_raw = ifnull(cust_rec.Customer_Name, "");
+        
+        clean_cust = cust_raw;
+        clean_cust = clean_cust.replaceAll(" Private Limited", "");
+        clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
+        clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
+        clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
+        clean_cust = clean_cust.replaceAll(" Limited", "");
+        clean_cust = clean_cust.replaceAll(" Ltd.", "");
+        clean_cust = clean_cust.replaceAll(" Ltd", "");
+        clean_cust = clean_cust.replaceAll(" & Research Centre", "");
+        clean_cust = clean_cust.replaceAll(" and Research Centre", "");
+        clean_cust = clean_cust.replaceAll(" & Research Center", "");
+        clean_cust = clean_cust.replaceAll(" and Research Center", "");
+        clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
+        clean_cust = clean_cust.replaceAll(" Multispeciality", "");
+        clean_cust = clean_cust.replaceAll(" Multispecialty", "");
+        clean_cust = clean_cust.replaceAll(" Superspeciality", "");
+        clean_cust = clean_cust.replaceAll(" Super Speciality", "");
+        clean_cust = clean_cust.trim();
+        
+        if(clean_cust.length() > 30)
+        {
+            c_words = clean_cust.toList(" ");
+            if(c_words.size() > 3)
+            {
+                clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+            }
+        }
+        
+        if(clean_cust != "")
+        {
+            input.Bed_Station_Title = clean_cust + " - Bed";
+        }
+        else
+        {
+            input.Bed_Station_Title = "Bed Station";
+        }
+    }
+    else
+    {
+        alert "Validation Error:\n\nPlease enter a Bed Station Title (e.g. 'Dhanya Ortho - ICU Bed 4').";
+        cancel submit;
+    }
 }
 
 if(input.Control_Unit == null)
@@ -68,8 +121,15 @@ if(input.Deployment_Start_Date == null)
 
 if(input.Deployment_Status == null || input.Deployment_Status == "")
 {
-    alert "Validation Error:\n\nPlease select a Deployment Status (Active, Inactive, or Closed).";
-    cancel submit;
+    if(input.ID == null)
+    {
+        input.Deployment_Status = "Active";
+    }
+    else
+    {
+        alert "Validation Error:\n\nPlease select a Deployment Status (Active, Inactive, or Closed).";
+        cancel submit;
+    }
 }
 
 // 2. Hardware Classification & Type Validation
@@ -108,10 +168,11 @@ if(input.Customer != null)
 }
 
 // 4. Active Deployment Hardware Conflict Guard
+status_active = "Active";
 if(input.Deployment_Status == "Active")
 {
     // Check if Control Unit is already deployed on another active bed station
-    existing_cu = Bed_Stations[Control_Unit == cu_id && Deployment_Status == "Active" && ID != curr_id];
+    existing_cu = Bed_Stations[Control_Unit == cu_id && Deployment_Status == status_active && ID != curr_id];
     if(existing_cu.count() > 0)
     {
         alert "Hardware Conflict:\n\nControl Unit '" + cu_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_cu.Bed_Station_ID.getAll() + " (" + existing_cu.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Control Unit.";
@@ -119,7 +180,7 @@ if(input.Deployment_Status == "Active")
     }
     
     // Check if Overlay is already deployed on another active bed station
-    existing_ov = Bed_Stations[Overlay_Asset == ov_id && Deployment_Status == "Active" && ID != curr_id];
+    existing_ov = Bed_Stations[Overlay_Asset == ov_id && Deployment_Status == status_active && ID != curr_id];
     if(existing_ov.count() > 0)
     {
         alert "Hardware Conflict:\n\nOverlay Asset '" + ov_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_ov.Bed_Station_ID.getAll() + " (" + existing_ov.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Overlay.";
@@ -134,7 +195,7 @@ if(input.Deployment_Type == "Rental" && input.Rental_Agreement != null && input.
     agr = Rental_Agreements[ID == agr_id];
     if(agr.count() > 0 && agr.Billing_Unit == "Month")
     {
-        active_monthly = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == "Active" && ID != curr_id];
+        active_monthly = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == status_active && ID != curr_id];
         if(active_monthly.count() > 0)
         {
             alert "Commercial Agreement Constraint:\n\nThis Fixed Monthly Rental agreement ('" + agr.Agreement_Title + "') already has an active Bed Station deployed:\n" + active_monthly.Bed_Station_ID.getAll() + " (" + active_monthly.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. To add more beds, please create a separate agreement or use a Daily (Pay-Per-Use) agreement.";

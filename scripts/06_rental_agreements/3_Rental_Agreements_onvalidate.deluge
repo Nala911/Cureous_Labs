@@ -58,16 +58,59 @@ if(input.Billing_Unit == null || input.Billing_Unit == "")
     }
 }
 
-// 4. Ensure Agreement Title is finalized
+// 4. Ensure Agreement Title is finalized (with smart auto-cleaning)
 if(input.Agreement_Title == null || input.Agreement_Title.trim() == "")
 {
     target_cust_id = input.Customer;
     target_item_id = input.Rental_Item;
     cust_rec = Customers[ID == target_cust_id];
     item_rec = Rental_Items[ID == target_item_id];
-    cust_name = ifnull(cust_rec.Customer_Name, "Customer");
-    item_name = ifnull(item_rec.Item_Name, "Rental Item");
-    input.Agreement_Title = cust_name + " - " + item_name;
+    cust_raw = ifnull(cust_rec.Customer_Name, "Customer");
+    item_raw = ifnull(item_rec.Item_Name, "Rental Item");
+    
+    clean_item = item_raw;
+    clean_item = clean_item.replaceAll("Rental - ", "");
+    clean_item = clean_item.replaceAll("Rental -", "");
+    clean_item = clean_item.replaceAll("™", "");
+    clean_item = clean_item.replaceAll("®", "");
+    clean_item = clean_item.replaceAll(" - Monthly", " (Monthly)");
+    clean_item = clean_item.replaceAll("- Monthly", " (Monthly)");
+    clean_item = clean_item.replaceAll(" - Daily", " (Daily)");
+    clean_item = clean_item.replaceAll("- Daily", " (Daily)");
+    clean_item = clean_item.trim();
+    
+    clean_cust = cust_raw;
+    clean_cust = clean_cust.replaceAll(" Private Limited", "");
+    clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
+    clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
+    clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
+    clean_cust = clean_cust.replaceAll(" Limited", "");
+    clean_cust = clean_cust.replaceAll(" Ltd.", "");
+    clean_cust = clean_cust.replaceAll(" Ltd", "");
+    clean_cust = clean_cust.replaceAll(" & Research Centre", "");
+    clean_cust = clean_cust.replaceAll(" and Research Centre", "");
+    clean_cust = clean_cust.replaceAll(" & Research Center", "");
+    clean_cust = clean_cust.replaceAll(" and Research Center", "");
+    clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Multispeciality", "");
+    clean_cust = clean_cust.replaceAll(" Multispecialty", "");
+    clean_cust = clean_cust.replaceAll(" Superspeciality", "");
+    clean_cust = clean_cust.replaceAll(" Super Speciality", "");
+    clean_cust = clean_cust.trim();
+    
+    if(clean_cust.length() > 30)
+    {
+        c_words = clean_cust.toList(" ");
+        if(c_words.size() > 3)
+        {
+            clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+        }
+    }
+    
+    input.Agreement_Title = clean_cust + " - " + clean_item;
 }
 
 // 5. Ensure Agreement Status is set

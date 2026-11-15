@@ -3,11 +3,10 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/02_customers/3_Customers_onvalidate.deluge
-// Fields Used  : [Customer_Name, Customer_ID, Customer_Status]
+// Fields Used  : [Customer_Name, Customer_ID]
 // Cross-Forms  : [Customers]
 // Purpose      : Enforces mandatory customer selection and Books profile linkage,
-//                executes duplicate guard with friendly user guidance, and
-//                guarantees default status initialization.
+//                and executes duplicate guard with friendly user guidance.
 // Optimization : Max 1 indexed query for duplicate check. Zero try-catch blocks.
 // ==============================================================================
 
@@ -18,26 +17,29 @@ if(input.Customer_Name == null || input.Customer_Name.trim() == "")
     cancel submit;
 }
 
-if(input.Customer_ID == null || input.Customer_ID.trim() == "")
+if(input.Customer_ID == null || input.Customer_ID <= 0)
 {
     alert "Customer Profile Missing: Unable to retrieve Zoho Books Contact ID.\n\nPlease re-select the customer from the dropdown to fetch their profile details from Zoho Books.";
     cancel submit;
 }
 
 // 2. Friendly Duplicate Guard
-target_contact_id = input.Customer_ID.trim();
+target_contact_id = input.Customer_ID.toLong();
 target_name = input.Customer_Name.trim();
-curr_id = input.ID;
 
-existing_customers = Customers[(Customer_ID == target_contact_id || Customer_Name == target_name) && ID != curr_id];
-if(existing_customers.count() > 0)
+existing_count = 0;
+if(input.ID == null)
+{
+    existing_count = Customers[Customer_ID == target_contact_id || Customer_Name == target_name].count();
+}
+else
+{
+    curr_id = input.ID;
+    existing_count = Customers[(Customer_ID == target_contact_id || Customer_Name == target_name) && ID != curr_id].count();
+}
+
+if(existing_count > 0)
 {
     alert "Customer Already Onboarded:\n\n'" + target_name + "' is already registered in Cureous PRS with Customer ID " + target_contact_id + ".\n\nDuplicate onboarding is prevented. You can view or use this customer from the 'All Customers' report.";
     cancel submit;
-}
-
-// 3. Safety Defaults for Status
-if(input.Customer_Status == null || input.Customer_Status == "")
-{
-    input.Customer_Status = "Active";
 }

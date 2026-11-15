@@ -9,11 +9,12 @@
 
 ## 1. Core Operating Principles
 1. **Dynamic Bedside Pairing**: Hardware is never locked into permanent pairs. Any compatible Control Unit and Overlay sitting at a hospital can be paired onto a bed station in seconds.
-2. **Two Deployment Pathways**:
+2. **Native Bedside Swapping**: If a Control Unit or Overlay fails or requires maintenance, staff can swap the component directly in Edit mode by selecting a replacement buffer unit already present at that customer site. The system seamlessly marks the broken/replaced unit `Rental_State = "Inactive"` (sitting in customer storage awaiting return) and marks the newly attached unit `Rental_State = "Active"`.
+3. **Two Deployment Pathways**:
    - **Rental Mode**: Anchored to a commercial `Rental_Agreements` contract. Customer and billing model flow from the agreement.
    - **For Trial Mode**: Deployed for clinical evaluation before any contract is signed. User selects the Customer directly.
-3. **Auto-Composed & Editable Title**: `Bed_Station_Title` automatically pre-fills with customer context upon selection of agreement or customer, remaining fully editable by staff for custom ward, room, or bed designations (e.g. "Dhanya Ortho Clinic - ICU Bed 4"). On submission, `(BST-0001)` is appended automatically for distinct audit identification.
-4. **Physical Custody Decoupling**: Physical custody remains linked to the dispatch `Stock_Transfers` record (`With-Customer`). Module 8 exclusively manages the operational pairing state via `Rental_State = "Active"` or `"Inactive"`.
+4. **Auto-Composed & Editable Title**: `Bed_Station_Title` automatically pre-fills with smart auto-cleaned customer context (e.g. `[Clean Customer] - Bed`), remaining fully editable by staff for custom ward, room, or bed designations (e.g. "Dhanya Ortho - ICU Bed 4"). On submission, ` #BST-0001` is appended automatically for distinct audit identification.
+5. **Physical Custody Decoupling**: Physical custody remains linked to the dispatch `Stock_Transfers` record (`With-Customer`). Module 8 exclusively manages the operational pairing state via `Rental_State = "Active"` or `"Inactive"`.
 
 ---
 
@@ -32,30 +33,26 @@
 4. **Bed Station Title** `[Single Line]` (Auto-filled with Customer context, fully editable by user)
    - Field Link Name: `Bed_Station_Title`
    - Form Behavior: Visible & Enabled on Add and Edit.
-5. **Control Unit** `[Lookup -> Devices, displaying Serial_Number]` (Mandatory; Filtered to Customer's site)
+5. **Control Unit** `[Lookup -> Devices, displaying Serial_Number]` (Mandatory; Filtered to Customer's site; Swappable in Edit)
    - Field Link Name: `Control_Unit`
-   - Form Behavior: Visible & Enabled on Add once Customer is determined; Locked in Edit mode. Dynamically populated with Control Units where `Current_Customer == Customer`.
-6. **Overlay Asset** `[Lookup -> Devices, displaying Serial_Number]` (Mandatory; Filtered to Customer's site)
+   - Form Behavior: Visible & Enabled on Add and Edit. In Add mode, enabled once Customer is determined. In Edit mode, enabled for bedside swaps when `Deployment_Status == "Active"`. Populated with Control Units located at this customer's site (excluding units deployed on other active bed stations).
+6. **Overlay Asset** `[Lookup -> Devices, displaying Serial_Number]` (Mandatory; Filtered to Customer's site; Swappable in Edit)
    - Field Link Name: `Overlay_Asset`
-   - Form Behavior: Visible & Enabled on Add once Customer is determined; Locked in Edit mode. Dynamically populated with Overlays where `Current_Customer == Customer`.
+   - Form Behavior: Visible & Enabled on Add and Edit. In Add mode, enabled once Customer is determined. In Edit mode, enabled for bedside swaps when `Deployment_Status == "Active"`. Populated with Overlays located at this customer's site (excluding units deployed on other active bed stations).
 7. **Deployment Start Date** `[Date-Time / Date]` (Mandatory; auto-filled with current timestamp, fully editable by user)
    - Field Link Name: `Deployment_Start_Date`
    - Form Behavior: Visible & Enabled on Add and Edit.
-8. **Deployment Status** `[Dropdown]` (Mandatory)
+8. **Deployment Status** `[Dropdown - Hidden on Add]` (Default: `"Active"`. Options: `"Active"`, `"Inactive"`, `"Closed"`)
    - Field Link Name: `Deployment_Status`
-   - Options: `"Active"`, `"Inactive"`, `"Closed"` (Default: `"Active"`)
-   - Form Behavior: Visible & Enabled on Add and Edit.
+   - Form Behavior: Hidden on Add (defaults to `"Active"`); Visible & Enabled in Edit mode.
 
 ### B. Auto-Derived Context Fields (Disabled / System-Managed):
-9. **Rental Item** `[Single Line]` (Auto-filled from Rental Agreement in Rental mode, or from Control Unit Product Model in Trial mode)
-   - Field Link Name: `Rental_Item`
-   - Form Behavior: Visible & Disabled on Add and Edit.
-10. **Bed Station ID** `[Auto-Number - Native Auto-Hidden on Add]` (Primary Key, Prefix: BST-, e.g. `BST-0001`)
-    - Field Link Name: `Bed_Station_ID`
-    - Form Behavior: Auto-Hidden on Add (PK; Natively locked in Edit).
-11. **Deployment End Date** `[Date-Time / Date]` (Auto-filled with current timestamp when status is set to "Closed")
+9. **Bed Station ID** `[Auto-Number - Native Auto-Hidden on Add]` (Primary Key, Prefix: BST-, e.g. `BST-0001`)
+   - Field Link Name: `Bed_Station_ID`
+   - Form Behavior: Auto-Hidden on Add (PK; Natively locked in Edit).
+10. **Deployment End Date** `[Date-Time - Hidden on Add]` (Auto-filled with current timestamp when status is set to "Closed")
     - Field Link Name: `Deployment_End_Date`
-    - Form Behavior: Visible & Disabled on Add and Edit.
+    - Form Behavior: Hidden on Add; Visible & Disabled in Edit mode.
 
 ---
 
@@ -65,23 +62,25 @@
 - **File**: `scripts/08_bed_stations/1_Bed_Stations_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable interactive user entry fields (`Deployment_Type`, `Rental_Agreement`, `Bed_Station_Title`, `Deployment_Start_Date`, `Deployment_Status`). Default `Deployment_Type = "Rental"`, `Deployment_Start_Date = zoho.currenttime`, `Deployment_Status = "Active"`. Disable context fields (`Customer`, `Rental_Item`, `Deployment_End_Date`). Disable hardware lookups (`Control_Unit`, `Overlay_Asset`) until customer/agreement is chosen.
-  - In EDIT Mode: Lock primary keys, contract anchors, deployment mode, customer, and hardware pairings (`Deployment_Type`, `Rental_Agreement`, `Customer`, `Rental_Item`, `Control_Unit`, `Overlay_Asset`, `Deployment_End_Date`). If `Deployment_Type == "For Trial"`, hide `Rental_Agreement`. Allow updates to `Bed_Station_Title`, `Deployment_Status`, and `Deployment_Start_Date`.
+  - In ADD Mode: Enable interactive user entry fields (`Deployment_Type`, `Rental_Agreement`, `Bed_Station_Title`, `Deployment_Start_Date`). Default `Deployment_Type = "Rental"`, `Deployment_Start_Date = zoho.currenttime`, and background default `Deployment_Status = "Active"`. Hide intake lifecycle fields (`Deployment_Status`, `Deployment_End_Date`). Disable context field (`Customer`). Disable hardware lookups (`Control_Unit`, `Overlay_Asset`) until customer/agreement is chosen.
+  - In EDIT Mode: Lock primary keys, contract anchors, deployment mode, customer, and closure date (`Deployment_Type`, `Rental_Agreement`, `Customer`, `Deployment_End_Date`). If `Deployment_Type == "For Trial"`, hide `Rental_Agreement`. Allow updates to `Bed_Station_Title`, `Deployment_Status`, and `Deployment_Start_Date`. Show `Deployment_Status` and `Deployment_End_Date`.
+    - If `Deployment_Status == "Active"`: Enable `Control_Unit` and `Overlay_Asset` to allow bedside hardware swaps. Dynamically query `Devices` at `input.Customer` site that are not deployed on other active bed stations (`ID != input.ID`) plus the currently paired devices, and populate both choice lists via UI tasks.
+    - If `Deployment_Status == "Closed"`: Keep `Control_Unit` and `Overlay_Asset` disabled.
 
 ### Workflow 2: On User Input (Deployment Type)
 - **File**: `scripts/08_bed_stations/2_1_Bed_Stations_onuserinput_deploymenttype.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Deployment_Type -> On User Input
 - **Plain English Logic**:
-  - When switched to `"Rental"`: Show and enable `Rental_Agreement`; show and disable `Customer`; clear `Rental_Agreement`, `Customer`, `Rental_Item`, `Control_Unit`, and `Overlay_Asset`; disable hardware fields until agreement is picked.
-  - When switched to `"For Trial"`: Hide and disable `Rental_Agreement` and clear it to `null`; show and enable `Customer` for direct selection; clear `Customer`, `Rental_Item`, `Control_Unit`, and `Overlay_Asset`; disable hardware fields until customer is picked.
+  - When switched to `"Rental"`: Show and enable `Rental_Agreement`; show and disable `Customer`; clear `Rental_Agreement`, `Customer`, `Control_Unit`, and `Overlay_Asset`; disable hardware fields until agreement is picked.
+  - When switched to `"For Trial"`: Hide and disable `Rental_Agreement` and clear it to `null`; show and enable `Customer` for direct selection; clear `Customer`, `Control_Unit`, and `Overlay_Asset`; disable hardware fields until customer is picked.
 
 ### Workflow 3: On User Input (Rental Agreement)
 - **File**: `scripts/08_bed_stations/2_2_Bed_Stations_onuserinput_rentalagreement.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Rental_Agreement -> On User Input
 - **Plain English Logic**:
   - Step 1: Query linked `Rental_Agreements` record.
-  - Step 2: Auto-populate `Customer` lookup and `Rental_Item` from agreement.
-  - Step 3: Auto-prefill `Bed_Station_Title` with Customer name if blank, keeping it fully editable.
+  - Step 2: Auto-populate `Customer` lookup from agreement.
+  - Step 3: Auto-prefill `Bed_Station_Title` with smart auto-cleaned customer context (`[Clean Customer] - Bed`) if blank, keeping it fully editable.
   - Step 4: Smart Bedside Hardware Retrieval: Query `Devices` located at `input.Customer` site. Exclude any devices already actively deployed on other `Active` Bed Stations at this facility. Populate `Control_Unit` choices with available Control Units and `Overlay_Asset` choices with available Overlays. Enable both hardware lookups.
   - Step 5: If parent agreement is Fixed Monthly (`Billing_Unit == "Month"`), display non-blocking alert if an active Bed Station is already attached.
 
@@ -89,25 +88,19 @@
 - **File**: `scripts/08_bed_stations/2_3_Bed_Stations_onuserinput_customer.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Customer -> On User Input
 - **Plain English Logic**:
-  - Step 1: When user selects `Customer` (in "For Trial" mode), dynamically pre-fill `Bed_Station_Title` with Customer name if blank, keeping it editable.
+  - Step 1: When user selects `Customer` (in "For Trial" mode), dynamically pre-fill `Bed_Station_Title` with smart auto-cleaned customer context (`[Clean Customer] - Bed`) if blank, keeping it editable.
   - Step 2: Smart Bedside Hardware Retrieval: Dynamically query `Devices` where `Current_Customer == input.Customer`. Exclude any devices already actively deployed on other `Active` Bed Stations.
   - Step 3: Populate `Control_Unit` choices with unassigned Control Units located at this customer's site, and `Overlay_Asset` choices with unassigned Overlays located at this customer's site.
   - Step 4: Clear prior hardware selections and enable both lookups. If customer has no available buffer units at their site, display a non-blocking notification.
 
-### Workflow 5: On User Input (Control Unit)
-- **File**: `scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_controlunit.deluge`
-- **Trigger**: Created or Edited -> Field Actions -> Control_Unit -> On User Input
-- **Plain English Logic**:
-  - In "For Trial" mode (or if `Rental_Item` is blank), query selected `Devices` record and auto-populate `Rental_Item` from the device's product model.
-
-### Workflow 6: On User Input (Deployment Status)
-- **File**: `scripts/08_bed_stations/2_6_Bed_Stations_onuserinput_deploymentstatus.deluge`
+### Workflow 5: On User Input (Deployment Status)
+- **File**: `scripts/08_bed_stations/2_4_Bed_Stations_onuserinput_deploymentstatus.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Deployment_Status -> On User Input
 - **Plain English Logic**:
   - Step 1: When user changes status to `"Closed"`, auto-populate `Deployment_End_Date` with `zoho.currenttime`.
   - Step 2: If status is reverted to `"Active"` or `"Inactive"`, clear `Deployment_End_Date = null`.
 
-### Workflow 7: On Form Validation & Safety Guard
+### Workflow 6: On Form Validation & Safety Guard
 - **File**: `scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Validate
 - **Plain English Logic**:
@@ -115,16 +108,17 @@
   - Step 2: Conditional contract check: If `Deployment_Type == "Rental"`, require `Rental_Agreement`. If `Deployment_Type == "For Trial"`, require `Customer`.
   - Step 3: Hardware classification check: Verify that `Control_Unit` has `Device_Type == "Control Unit"` and `Overlay_Asset` has `Device_Type == "Overlay"`.
   - Step 4: Customer site custody guard: Verify that both selected `Control_Unit` and `Overlay_Asset` currently reside at `input.Customer` site (`Current_Customer == input.Customer`).
-  - Step 5: Duplicate active hardware guard: Ensure neither `Control_Unit` nor `Overlay_Asset` is already deployed on another active bed station.
-  - Step 6: Fixed Monthly 1-to-1 enforcement: If `Deployment_Type == "Rental"` and agreement is Fixed Monthly, cancel submit if another active station already exists under that contract.
-  - Step 7: Fallbacks: Ensure `Bed_Station_Title` is populated; set `Deployment_End_Date` if status is "Closed".
+  - Step 5: Duplicate active hardware guard: Ensure neither `Control_Unit` nor `Overlay_Asset` is already deployed on another active bed station (excluding `ID != input.ID` in Edit mode).
+  - Step 6: Fixed Monthly 1-to-1 enforcement: If `Deployment_Type == "Rental"` and agreement is Fixed Monthly, cancel submit if another active station already exists under that contract (excluding `ID != input.ID`).
+  - Step 7: Fallbacks: Ensure `Bed_Station_Title` is populated (applying smart auto-clean fallback if blank); set `Deployment_End_Date` if status is "Closed".
 
-### Workflow 8: On Form Submission Success
+### Workflow 7: On Form Submission Success
 - **File**: `scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Success
 - **Plain English Logic**:
   - Step 1: Update physical asset lifecycle in `Devices`:
-    - If `Deployment_Status == "Active"`: Set `Rental_State = "Active"` and `Current_Customer = input.Customer` for both Control Unit and Overlay (physical custody remains linked to the dispatch transfer).
-    - If `Deployment_Status == "Closed"`: Set `Rental_State = "Inactive"` for both Control Unit and Overlay.
-  - Step 2: Maintain historical interval in `Bed_Station_Logs`.
-  - Step 4: Append generated `Bed_Station_ID` to `Bed_Station_Title` in database record if not already present.
+    - If `Deployment_Status == "Active"`: Set `Rental_State = "Active"` and `Current_Customer = input.Customer` for both `input.Control_Unit` and `input.Overlay_Asset`.
+    - Native Hardware Swap Reconciliation: Query devices at this customer site that were previously active on this bed station but are no longer selected (`ID != input.Control_Unit && ID != input.Overlay_Asset`); if they are not active on any other active bed station, revert their `Rental_State = "Inactive"`.
+    - If `Deployment_Status == "Closed"`: Set `Rental_State = "Inactive"` for both `input.Control_Unit` and `input.Overlay_Asset`.
+  - Step 2: Append generated ` #[Bed_Station_ID]` identifier to `Bed_Station_Title` in database record if not already present.
+  - Step 3: Redirect cleanly to `All_Bed_Stations` report view (`openUrl("#Report:All_Bed_Stations", "same window");`).

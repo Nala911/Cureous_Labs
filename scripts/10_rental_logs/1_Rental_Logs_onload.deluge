@@ -1,12 +1,14 @@
 // ==============================================================================
 // Module Name  : Rental Logs (Form Link Name: Rental_Logs)
-// Script Type  : Form Workflow
+// Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/10_rental_logs/1_Rental_Logs_onload.deluge
 // Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Agreed_Rate, Number_of_Days, Taxable_Value, Billing_Status]
 // Cross-Forms  : None
 // Purpose      : Controls field accessibility and initializes initial billing status.
-// Optimization : Pure UI manipulation with zero database queries.
+//                Hides Billing_Status on Add (defaults to Pending Invoice); shows
+//                Billing_Status in Edit mode. Locks inputs if already invoiced.
+// Optimization : Pure UI manipulation with zero database queries. Law 1 & Law 5 compliant.
 // ==============================================================================
 
 // Disable auto-derived context fields on both Add and Edit
@@ -25,12 +27,14 @@ if(input.ID == null)
     enable Agreed_Rate;
     enable Number_of_Days;
     
-    // Set initial billing status
+    // Set initial billing status and hide from user on entry
     input.Billing_Status = "Pending Invoice";
+    hide Billing_Status;
 }
 else
 {
-    // EDIT MODE: Lock primary relational anchor
+    // EDIT MODE: Show Billing Status and lock primary relational anchor
+    show Billing_Status;
     disable Bed_Station;
     
     // Check if record is still pending invoice

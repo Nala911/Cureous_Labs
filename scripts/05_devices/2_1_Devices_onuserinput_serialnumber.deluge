@@ -3,14 +3,14 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Serial_Number -> On User Input
 // File Path    : scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge
-// Fields Used  : [Serial_Number, Lot_Number, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office]
+// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office]
 // Cross-Forms  : [Offices, Lots, Devices, Product_Model]
 // Purpose      : Validates Serial Number syntax, checks for duplicates,
 //                auto-derives Device Type and Product Model lookup, sets initial
 //                Device Stage ("0 - CU Mfg Not Yet Started" or "0 - OV Mfg Not Yet Started"),
 //                sets initial Rental State to "Inactive", leaves Current Custody blank
 //                (stamped upon first transfer), auto-initializes Current Office to Primary Hub,
-//                and auto-fills Lot Number with the latest manufacturing lot (allowing
+//                and auto-fills Lot with the latest manufacturing lot (allowing
 //                manual override by the user).
 // Optimization : Single indexed query for duplicate check, single indexed query for
 //                Product Model, single indexed range 1 to 1 query for latest lot.
@@ -38,7 +38,7 @@ if(input.Serial_Number != null && input.Serial_Number != "")
         input.Rental_State = null;
         input.Current_Custody = null;
         input.Current_Office = null;
-        input.Lot_Number = null;
+        input.Lot = null;
     }
     else
     {
@@ -54,7 +54,7 @@ if(input.Serial_Number != null && input.Serial_Number != "")
             input.Device_Stage = null;
             input.Rental_State = null;
             input.Current_Custody = null;
-            input.Lot_Number = null;
+            input.Lot = null;
         }
         else
         {
@@ -76,7 +76,7 @@ if(input.Serial_Number != null && input.Serial_Number != "")
                 input.Device_Stage = null;
                 input.Rental_State = null;
                 input.Current_Custody = null;
-                input.Lot_Number = null;
+                input.Lot = null;
             }
             else
             {
@@ -116,12 +116,12 @@ if(input.Serial_Number != null && input.Serial_Number != "")
                 }
                 
                 // 8. Auto-Fill Latest Manufacturing Lot (Technician can still change manually)
-                if(input.Lot_Number == null)
+                if(input.Lot == null)
                 {
                     dummy_id = 0;
                     for each lot_rec in Lots [ID != dummy_id] sort by Added_Time desc range from 1 to 1
                     {
-                        input.Lot_Number = lot_rec.ID;
+                        input.Lot = lot_rec.ID;
                     }
                 }
             }
@@ -137,5 +137,5 @@ else
     input.Rental_State = null;
     input.Current_Custody = null;
     input.Current_Office = null;
-    input.Lot_Number = null;
+    input.Lot = null;
 }

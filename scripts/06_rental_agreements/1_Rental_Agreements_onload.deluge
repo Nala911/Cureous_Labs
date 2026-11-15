@@ -3,7 +3,7 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge
-// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Title, Agreement_Start_Date, Billing_Unit, Agreement_Status, Agreement_End_Date, Security_Deposit, Rental_Agreement_ID]
+// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Title, Agreement_Start_Date, Billing_Unit, Agreement_Status, Agreement_End_Date, Security_Deposit]
 // Cross-Forms  : None
 // Purpose      : Intelligent Form UX: In Add mode, user entry fields are Customer,
 //                Rental Item, Agreed Rate, Agreement Title (editable), and Agreement
@@ -52,10 +52,9 @@ if(input.ID == null)
 }
 else
 {
-    // 4. EDIT Mode: Contract identity is immutable
+    // 4. EDIT Mode: Contract identity is immutable (Rental_Agreement_ID is natively locked Auto-Number)
     disable Customer;
     disable Rental_Item;
-    disable Rental_Agreement_ID;
     
     // Background field stays hidden
     hide Billing_Unit;
@@ -72,6 +71,5 @@ else
     // Display lifecycle tracking fields in edit mode
     show Agreement_Status;
     show Agreement_End_Date;
-    show Rental_Agreement_ID;
     show Security_Deposit;
 }

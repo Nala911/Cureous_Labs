@@ -5,9 +5,10 @@
 // File Path    : scripts/07_stock_transfers/4_Stock_Transfers_onsuccess.deluge
 // Fields Used  : [Devices, Transfer_Status, Transfer_Type, Destination_Office, Destination_Customer]
 // Cross-Forms  : [Devices]
-// Purpose      : Synchronizes physical hardware custody, branch office, and rental
-//                state in Devices directly from the multi-select Devices lookup across
-//                all transfer lifecycle stages (Dispatched, In-Transit, Delivered).
+// Purpose      : 1. Synchronizes physical hardware custody, branch office, and rental
+//                   state in Devices directly from the multi-select Devices lookup across
+//                   all transfer lifecycle stages (Dispatched, In-Transit, Delivered).
+//                2. Navigates cleanly to the 'All_Stock_Transfers' report upon successful save.
 // Optimization : Lean single-form architecture. Zero child audit table queries or inserts.
 // ==============================================================================
 
@@ -54,3 +55,6 @@ if(input.Devices != null)
         }
     }
 }
+
+// 3. Redirect cleanly to the All_Stock_Transfers report view
+openUrl("#Report:All_Stock_Transfers", "same window");

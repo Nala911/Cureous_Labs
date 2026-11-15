@@ -99,4 +99,4 @@ On load, only `Transfer Type` and `Transfer Date` are enabled. Selecting the tra
     - `In-Transit`: `Current_Office = null`, `Current_Customer = null`, `Rental_State = "Inactive"`.
     - `In-Office`: `Current_Office = Destination_Office`, `Current_Customer = null`, `Rental_State = "Inactive"`.
     - `With-Customer`: `Current_Customer = Destination_Customer`, `Current_Office = null`, `Rental_State = "Inactive"`.
-  - Step 3: Post-Submission Navigation: Relies on Zoho Creator's native Form Properties (**Form Properties -> General -> On Successful Submission -> Redirect to Report / Display Message**) to dismiss modal dialogs and refresh views without client-side Deluge script hangs.
+  - Step 3: Redirect cleanly to `All_Stock_Transfers` report view (`openUrl("#Report:All_Stock_Transfers", "same window");`).

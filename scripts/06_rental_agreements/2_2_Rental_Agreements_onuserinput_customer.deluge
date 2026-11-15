@@ -1,52 +1,107 @@
 // ==============================================================================
 // Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
-// Script Type  : Form Workflow
+// Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Customer -> On User Input
 // File Path    : scripts/06_rental_agreements/2_2_Rental_Agreements_onuserinput_customer.deluge
 // Fields Used  : [Customer, Rental_Item, Agreement_Title]
 // Cross-Forms  : [Customers, Rental_Items]
-// Purpose      : When Customer is selected or changed, dynamically generates or updates
-//                the default Agreement Title (Customer Name - Rental Item Name)
-//                while leaving it fully editable by the user.
-// Optimization : Single indexed lookup on Customers and Rental_Items.
+// Purpose      : When Customer is selected or changed, dynamically generates a clean,
+//                concise default Agreement Title (Clean Customer - Clean Model),
+//                stripping legal noise suffixes while leaving title fully user-editable.
+// Optimization : Single indexed lookup on Customers and Rental_Items. Law 1 compliant.
 // ==============================================================================
 
 if(input.Customer != null)
 {
     cust_id = input.Customer;
     cust_rec = Customers[ID == cust_id];
-    cust_name = ifnull(cust_rec.Customer_Name, "");
+    cust_raw = ifnull(cust_rec.Customer_Name, "");
     
-    // If Rental Item is already selected, combine Customer Name and Item Name
+    // Clean Customer Name: Strip common corporate suffixes & prevent unwieldy length
+    clean_cust = cust_raw;
+    clean_cust = clean_cust.replaceAll(" Private Limited", "");
+    clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
+    clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
+    clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
+    clean_cust = clean_cust.replaceAll(" Limited", "");
+    clean_cust = clean_cust.replaceAll(" Ltd.", "");
+    clean_cust = clean_cust.replaceAll(" Ltd", "");
+    clean_cust = clean_cust.replaceAll(" & Research Centre", "");
+    clean_cust = clean_cust.replaceAll(" and Research Centre", "");
+    clean_cust = clean_cust.replaceAll(" & Research Center", "");
+    clean_cust = clean_cust.replaceAll(" and Research Center", "");
+    clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
+    clean_cust = clean_cust.replaceAll(" Multispeciality", "");
+    clean_cust = clean_cust.replaceAll(" Multispecialty", "");
+    clean_cust = clean_cust.replaceAll(" Superspeciality", "");
+    clean_cust = clean_cust.replaceAll(" Super Speciality", "");
+    clean_cust = clean_cust.trim();
+    
+    if(clean_cust.length() > 30)
+    {
+        c_words = clean_cust.toList(" ");
+        if(c_words.size() > 3)
+        {
+            clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+        }
+    }
+    
+    // If Rental Item is already selected, combine clean customer and clean item
     if(input.Rental_Item != null)
     {
         target_item_id = input.Rental_Item;
         item_rec = Rental_Items[ID == target_item_id];
         item_name = ifnull(item_rec.Item_Name, "");
         
-        if(cust_name != "" && item_name != "")
+        clean_item = item_name;
+        clean_item = clean_item.replaceAll("Rental - ", "");
+        clean_item = clean_item.replaceAll("Rental -", "");
+        clean_item = clean_item.replaceAll("™", "");
+        clean_item = clean_item.replaceAll("®", "");
+        clean_item = clean_item.replaceAll(" - Monthly", " (Monthly)");
+        clean_item = clean_item.replaceAll("- Monthly", " (Monthly)");
+        clean_item = clean_item.replaceAll(" - Daily", " (Daily)");
+        clean_item = clean_item.replaceAll("- Daily", " (Daily)");
+        clean_item = clean_item.trim();
+        
+        if(clean_cust != "" && clean_item != "")
         {
-            input.Agreement_Title = cust_name + " - " + item_name;
+            input.Agreement_Title = clean_cust + " - " + clean_item;
         }
-        else if(cust_name != "")
+        else if(clean_cust != "")
         {
-            input.Agreement_Title = cust_name;
+            input.Agreement_Title = clean_cust;
         }
     }
-    else if(cust_name != "")
+    else if(clean_cust != "")
     {
-        input.Agreement_Title = cust_name;
+        input.Agreement_Title = clean_cust;
     }
 }
 else
 {
-    // Customer selection cleared: If item is still chosen, retain item in title, else clear
+    // Customer selection cleared: If item is still chosen, retain clean item in title, else clear
     if(input.Rental_Item != null)
     {
         target_item_id = input.Rental_Item;
         item_rec = Rental_Items[ID == target_item_id];
         item_name = ifnull(item_rec.Item_Name, "");
-        input.Agreement_Title = item_name;
+        
+        clean_item = item_name;
+        clean_item = clean_item.replaceAll("Rental - ", "");
+        clean_item = clean_item.replaceAll("Rental -", "");
+        clean_item = clean_item.replaceAll("™", "");
+        clean_item = clean_item.replaceAll("®", "");
+        clean_item = clean_item.replaceAll(" - Monthly", " (Monthly)");
+        clean_item = clean_item.replaceAll("- Monthly", " (Monthly)");
+        clean_item = clean_item.replaceAll(" - Daily", " (Daily)");
+        clean_item = clean_item.replaceAll("- Daily", " (Daily)");
+        clean_item = clean_item.trim();
+        
+        input.Agreement_Title = clean_item;
     }
     else
     {
