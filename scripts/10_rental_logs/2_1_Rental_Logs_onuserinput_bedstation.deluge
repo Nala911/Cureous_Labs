@@ -42,9 +42,14 @@ else
             if(agmt_rec != null)
             {
                 input.Agreed_Rate = agmt_rec.Agreed_Rate;
-                if(agmt_rec.Billing_Unit == "Month")
+                if(agmt_rec.Rental_Item != null)
                 {
-                    is_monthly = true;
+                    r_item_id = agmt_rec.Rental_Item;
+                    r_item = Rental_Items[ID == r_item_id];
+                    if(r_item != null && r_item.Billing_Unit == "Month")
+                    {
+                        is_monthly = true;
+                    }
                 }
             }
         }

@@ -3,17 +3,21 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Bed_Station_ID, Deployment_End_Date]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Deployment_End_Date, Swap, Swap_Reason]
 // Cross-Forms  : [Rental_Agreements, Devices, Customers, Bed_Stations]
 // Purpose      : Comprehensive clinical, commercial, and operational validation:
 //                1. Validates mandatory fields based on Deployment_Type.
-//                2. Validates Bed_Station_Title is specified.
+//                2. Finalizes Bed_Station_Title and guarantees uniqueness among Active beds.
 //                3. Verifies hardware classification (CU pump vs Overlay mattress).
 //                4. Ensures selected hardware physically resides at Customer's site.
 //                5. Blocks duplicate active hardware assignment across all bed stations.
 //                6. Enforces strict 1-to-1 active station limit for Fixed Monthly contracts.
-//                7. Guarantees closure timestamp on decommission.
-// Optimization : Max 4 indexed queries. Zero try-catch blocks. Law 1 compliant.
+//                7. Executes Bedside Hardware Swap Mode (if Swap == true):
+//                   - Validates Swap_Reason and verifies new unit selection.
+//                   - Inserts new active record with new hardware pair and identical title.
+//                   - Reverts and closes current record with original hardware and End Date.
+//                   - Updates device stages (sets replaced units to Repair Needed & Inactive).
+// Optimization : Targeted indexed queries outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
 curr_id = 0;
@@ -46,52 +50,36 @@ else if(input.Deployment_Type == "For Trial")
     }
 }
 
+// 2. Ensure Bed Station Title is Populated (Fallback generation if blank)
 if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
 {
     if(input.Customer != null)
     {
         target_cust = input.Customer;
         cust_rec = Customers[ID == target_cust];
-        cust_raw = ifnull(cust_rec.Customer_Name, "");
+        cust_raw = ifnull(cust_rec.Customer_Name, "").trim();
         
-        clean_cust = cust_raw;
-        clean_cust = clean_cust.replaceAll(" Private Limited", "");
-        clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
-        clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
-        clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
-        clean_cust = clean_cust.replaceAll(" Limited", "");
-        clean_cust = clean_cust.replaceAll(" Ltd.", "");
-        clean_cust = clean_cust.replaceAll(" Ltd", "");
-        clean_cust = clean_cust.replaceAll(" & Research Centre", "");
-        clean_cust = clean_cust.replaceAll(" and Research Centre", "");
-        clean_cust = clean_cust.replaceAll(" & Research Center", "");
-        clean_cust = clean_cust.replaceAll(" and Research Center", "");
-        clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Multispeciality", "");
-        clean_cust = clean_cust.replaceAll(" Multispecialty", "");
-        clean_cust = clean_cust.replaceAll(" Superspeciality", "");
-        clean_cust = clean_cust.replaceAll(" Super Speciality", "");
-        clean_cust = clean_cust.trim();
-        
-        if(clean_cust.length() > 30)
+        clean_cust = "";
+        c_words = cust_raw.toList(" ");
+        if(c_words.size() > 3)
         {
-            c_words = clean_cust.toList(" ");
-            if(c_words.size() > 3)
-            {
-                clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
-            }
-        }
-        
-        if(clean_cust != "")
-        {
-            input.Bed_Station_Title = clean_cust + " - Bed";
+            clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
         }
         else
         {
-            input.Bed_Station_Title = "Bed Station";
+            clean_cust = cust_raw;
+        }
+        
+        existing_beds = Bed_Stations[Customer == target_cust && ID != curr_id];
+        next_bed_num = existing_beds.count() + 1;
+        
+        if(clean_cust != "")
+        {
+            input.Bed_Station_Title = clean_cust + " #" + next_bed_num;
+        }
+        else
+        {
+            input.Bed_Station_Title = "Bed Station #" + next_bed_num;
         }
     }
     else
@@ -99,6 +87,16 @@ if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
         alert "Validation Error:\n\nPlease enter a Bed Station Title (e.g. 'Dhanya Ortho - ICU Bed 4').";
         cancel submit;
     }
+}
+
+// 3. Uniqueness Check on Bed Station Title (Among Active Bed Stations)
+target_title = input.Bed_Station_Title.trim();
+status_active = "Active";
+existing_title = Bed_Stations[Bed_Station_Title == target_title && Deployment_Status == status_active && ID != curr_id];
+if(existing_title.count() > 0)
+{
+    alert "Duplicate Bed Station Title:\n\nAn Active Bed Station with the title '" + target_title + "' already exists in the system.\n\nPlease enter a unique title or specify a distinct ward/bed designation.";
+    cancel submit;
 }
 
 if(input.Control_Unit == null)
@@ -132,7 +130,7 @@ if(input.Deployment_Status == null || input.Deployment_Status == "")
     }
 }
 
-// 2. Hardware Classification & Type Validation
+// 4. Hardware Classification & Type Validation
 cu_id = input.Control_Unit;
 cu_rec = Devices[ID == cu_id];
 if(cu_rec.count() == 0 || cu_rec.Device_Type != "Control Unit")
@@ -149,8 +147,7 @@ if(ov_rec.count() == 0 || ov_rec.Device_Type != "Overlay")
     cancel submit;
 }
 
-// 3. Customer Site Custody Guard
-// Ensure both selected assets physically reside at the assigned customer's facility
+// 5. Customer Site Custody Guard
 if(input.Customer != null)
 {
     target_cust = input.Customer;
@@ -167,44 +164,157 @@ if(input.Customer != null)
     }
 }
 
-// 4. Active Deployment Hardware Conflict Guard
-status_active = "Active";
+// 6. Active Deployment Hardware Conflict Guard
 if(input.Deployment_Status == "Active")
 {
-    // Check if Control Unit is already deployed on another active bed station
     existing_cu = Bed_Stations[Control_Unit == cu_id && Deployment_Status == status_active && ID != curr_id];
     if(existing_cu.count() > 0)
     {
-        alert "Hardware Conflict:\n\nControl Unit '" + cu_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_cu.Bed_Station_ID.getAll() + " (" + existing_cu.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Control Unit.";
+        alert "Hardware Conflict:\n\nControl Unit '" + cu_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_cu.Bed_Station_Title.getAll() + ".\n\nPlease select an available unassigned Control Unit.";
         cancel submit;
     }
     
-    // Check if Overlay is already deployed on another active bed station
     existing_ov = Bed_Stations[Overlay_Asset == ov_id && Deployment_Status == status_active && ID != curr_id];
     if(existing_ov.count() > 0)
     {
-        alert "Hardware Conflict:\n\nOverlay Asset '" + ov_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_ov.Bed_Station_ID.getAll() + " (" + existing_ov.Bed_Station_Title.getAll() + ").\n\nPlease select an available unassigned Overlay.";
+        alert "Hardware Conflict:\n\nOverlay Asset '" + ov_rec.Serial_Number + "' is already actively deployed on Bed Station: " + existing_ov.Bed_Station_Title.getAll() + ".\n\nPlease select an available unassigned Overlay.";
         cancel submit;
     }
 }
 
-// 5. Fixed Monthly Rental Agreement 1-to-1 Enforcement
+// 7. Fixed Monthly Rental Agreement 1-to-1 Enforcement
 if(input.Deployment_Type == "Rental" && input.Rental_Agreement != null && input.Deployment_Status == "Active")
 {
     agr_id = input.Rental_Agreement;
     agr = Rental_Agreements[ID == agr_id];
-    if(agr.count() > 0 && agr.Billing_Unit == "Month")
+    if(agr.count() > 0 && agr.Rental_Item != null)
     {
-        active_monthly = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == status_active && ID != curr_id];
-        if(active_monthly.count() > 0)
+        r_item_id = agr.Rental_Item;
+        r_item = Rental_Items[ID == r_item_id];
+        if(r_item != null && r_item.Billing_Unit == "Month")
         {
-            alert "Commercial Agreement Constraint:\n\nThis Fixed Monthly Rental agreement ('" + agr.Agreement_Title + "') already has an active Bed Station deployed:\n" + active_monthly.Bed_Station_ID.getAll() + " (" + active_monthly.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements permit strictly 1 active station at a time. To add more beds, please create a separate agreement or use a Daily (Pay-Per-Use) agreement.";
-            cancel submit;
+            active_monthly = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == status_active && ID != curr_id];
+            if(active_monthly.count() > 0)
+            {
+                alert "Commercial Agreement Constraint:\n\nThis Fixed Monthly Rental agreement ('" + agr.Agreement_Title + "') already has an active Bed Station deployed:\n" + active_monthly.Bed_Station_Title.getAll() + ".\n\nFixed Monthly agreements permit strictly 1 active station at a time. To add more beds, please create a separate agreement or use a Daily (Pay-Per-Use) agreement.";
+                cancel submit;
+            }
         }
     }
 }
 
-// 6. Ensure Closure Timestamp
+// 8. Operational Hardware Swap Mode Execution
+if(input.Swap == true && curr_id > 0)
+{
+    // A. Validate Swap Reason is populated
+    if(input.Swap_Reason == null || input.Swap_Reason.trim() == "")
+    {
+        alert "Validation Error:\n\nPlease enter a Swap Reason explaining why this hardware is being replaced (e.g. motor breakdown, error code E-02, or damage).";
+        cancel submit;
+    }
+    
+    // B. Query existing database record to retrieve pre-edit hardware pairing
+    old_station_id = curr_id;
+    old_station = Bed_Stations[ID == old_station_id];
+    if(old_station.count() > 0)
+    {
+        old_cu_id = old_station.Control_Unit;
+        old_ov_id = old_station.Overlay_Asset;
+        new_cu_id = input.Control_Unit;
+        new_ov_id = input.Overlay_Asset;
+        
+        // C. Verify at least one device was changed
+        if(new_cu_id == old_cu_id && new_ov_id == old_ov_id)
+        {
+            alert "Validation Error:\n\nHardware Swap Mode is activated, but neither the Control Unit nor the Overlay was changed.\n\nPlease select the replacement hardware unit(s), or uncheck 'Swap Hardware?'.";
+            cancel submit;
+        }
+        
+        // D. Clinical Safety Guard: Newly selected replacement unit(s) must be in Ready Condition
+        if(new_cu_id != old_cu_id && new_cu_id != null)
+        {
+            target_new_cu = Devices[ID == new_cu_id];
+            if(target_new_cu.count() > 0 && target_new_cu.Device_Stage != "6 - CU Ready Condition")
+            {
+                alert "Clinical Safety Alert:\n\nThe selected replacement Control Unit ('" + target_new_cu.Serial_Number + "') is currently in stage '" + target_new_cu.Device_Stage + "'.\n\nOnly devices in '6 - CU Ready Condition' can be deployed at bedside.";
+                cancel submit;
+            }
+        }
+        if(new_ov_id != old_ov_id && new_ov_id != null)
+        {
+            target_new_ov = Devices[ID == new_ov_id];
+            if(target_new_ov.count() > 0 && target_new_ov.Device_Stage != "6 - OV Ready Condition")
+            {
+                alert "Clinical Safety Alert:\n\nThe selected replacement Overlay ('" + target_new_ov.Serial_Number + "') is currently in stage '" + target_new_ov.Device_Stage + "'.\n\nOnly devices in '6 - OV Ready Condition' can be deployed at bedside.";
+                cancel submit;
+            }
+        }
+        
+        // E. Execute the Swap: Insert brand new Active Bed Station record with identical Room Title
+        swap_time = zoho.currenttime;
+        
+        new_station_id = insert into Bed_Stations
+        [
+            Deployment_Type = old_station.Deployment_Type
+            Rental_Agreement = old_station.Rental_Agreement
+            Customer = old_station.Customer
+            Bed_Station_Title = old_station.Bed_Station_Title
+            Control_Unit = new_cu_id
+            Overlay_Asset = new_ov_id
+            Deployment_Start_Date = swap_time
+            Deployment_Status = "Active"
+        ];
+        
+        // F. Activate New Replacement Hardware in Devices Master
+        if(new_cu_id != null)
+        {
+            n_cu = Devices[ID == new_cu_id];
+            if(n_cu != null)
+            {
+                n_cu.Rental_State = "Active";
+                n_cu.Current_Customer = input.Customer;
+            }
+        }
+        if(new_ov_id != null)
+        {
+            n_ov = Devices[ID == new_ov_id];
+            if(n_ov != null)
+            {
+                n_ov.Rental_State = "Active";
+                n_ov.Current_Customer = input.Customer;
+            }
+        }
+        
+        // G. Update Replaced Hardware: Set to Inactive and mark Repair Needed (4-Pillar Tracking)
+        if(new_cu_id != old_cu_id && old_cu_id != null)
+        {
+            o_cu = Devices[ID == old_cu_id];
+            if(o_cu != null)
+            {
+                o_cu.Rental_State = "Inactive";
+                o_cu.Device_Stage = "CU Repair Needed";
+            }
+        }
+        if(new_ov_id != old_ov_id && old_ov_id != null)
+        {
+            o_ov = Devices[ID == old_ov_id];
+            if(o_ov != null)
+            {
+                o_ov.Rental_State = "Inactive";
+                o_ov.Device_Stage = "OV Repair Needed";
+            }
+        }
+        
+        // H. Archive Current Record: Restore original devices and mark Closed with End Date
+        input.Control_Unit = old_cu_id;
+        input.Overlay_Asset = old_ov_id;
+        input.Deployment_End_Date = swap_time;
+        input.Deployment_Status = "Closed";
+        input.Swap = false;
+    }
+}
+
+// 9. Ensure Closure Timestamp
 if(input.Deployment_Status == "Closed" && input.Deployment_End_Date == null)
 {
     input.Deployment_End_Date = zoho.currenttime;

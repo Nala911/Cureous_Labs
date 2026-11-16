@@ -1,14 +1,21 @@
 // ==============================================================================
 // Module Name  : Rental Agreements (Form Link Name: Rental_Agreements)
-// Script Type  : Form Workflow
+// Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/06_rental_agreements/3_Rental_Agreements_onvalidate.deluge
-// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Start_Date, Billing_Unit, Agreement_Title, Agreement_Status]
+// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Start_Date, Agreement_Title, Agreement_Status]
 // Cross-Forms  : [Customers, Rental_Items, Rental_Agreements]
 // Purpose      : Validates mandatory commercial fields, ensures rate > 0, enforces
-//                single active Daily agreement guard, and finalizes title/Billing Unit in background.
-// Optimization : Max 2 indexed queries. Zero try-catch blocks.
+//                single active Daily agreement guard (inspecting Rental_Item.Billing_Unit),
+//                finalizes title with #Count+1, and guarantees strict uniqueness on Agreement_Title.
+// Optimization : Max 3 indexed queries. Zero try-catch blocks. Law 1 compliant.
 // ==============================================================================
+
+curr_id = 0;
+if(input.ID != null)
+{
+    curr_id = input.ID;
+}
 
 // 1. Mandatory Field Checks
 if(input.Customer == null)
@@ -35,82 +42,51 @@ if(input.Agreement_Start_Date == null)
     input.Agreement_Start_Date = zoho.currentdate;
 }
 
-// 3. Ensure Billing Unit is populated from Rental Items (Background safety guard)
-if(input.Billing_Unit == null || input.Billing_Unit == "")
-{
-    target_item_id = input.Rental_Item;
-    item_rec = Rental_Items[ID == target_item_id];
-    if(item_rec != null && item_rec.count() > 0)
-    {
-        b_unit = ifnull(item_rec.Billing_Unit, "");
-        if(b_unit != null && b_unit != "")
-        {
-            input.Billing_Unit = b_unit;
-        }
-        else if(item_rec.Item_Name.toLowerCase().contains("monthly") || item_rec.Item_Name.toLowerCase().contains("month"))
-        {
-            input.Billing_Unit = "Month";
-        }
-        else
-        {
-            input.Billing_Unit = "Day";
-        }
-    }
-}
-
-// 4. Ensure Agreement Title is finalized (with smart auto-cleaning)
+// 3. Ensure Agreement Title is finalized (Fallback generation if blank)
 if(input.Agreement_Title == null || input.Agreement_Title.trim() == "")
 {
     target_cust_id = input.Customer;
     target_item_id = input.Rental_Item;
     cust_rec = Customers[ID == target_cust_id];
     item_rec = Rental_Items[ID == target_item_id];
-    cust_raw = ifnull(cust_rec.Customer_Name, "Customer");
+    cust_raw = ifnull(cust_rec.Customer_Name, "Customer").trim();
     item_raw = ifnull(item_rec.Item_Name, "Rental Item");
     
-    clean_item = item_raw;
-    clean_item = clean_item.replaceAll("Rental - ", "");
-    clean_item = clean_item.replaceAll("Rental -", "");
-    clean_item = clean_item.replaceAll("™", "");
-    clean_item = clean_item.replaceAll("®", "");
-    clean_item = clean_item.replaceAll(" - Monthly", " (Monthly)");
-    clean_item = clean_item.replaceAll("- Monthly", " (Monthly)");
-    clean_item = clean_item.replaceAll(" - Daily", " (Daily)");
-    clean_item = clean_item.replaceAll("- Daily", " (Daily)");
-    clean_item = clean_item.trim();
-    
-    clean_cust = cust_raw;
-    clean_cust = clean_cust.replaceAll(" Private Limited", "");
-    clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
-    clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
-    clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
-    clean_cust = clean_cust.replaceAll(" Limited", "");
-    clean_cust = clean_cust.replaceAll(" Ltd.", "");
-    clean_cust = clean_cust.replaceAll(" Ltd", "");
-    clean_cust = clean_cust.replaceAll(" & Research Centre", "");
-    clean_cust = clean_cust.replaceAll(" and Research Centre", "");
-    clean_cust = clean_cust.replaceAll(" & Research Center", "");
-    clean_cust = clean_cust.replaceAll(" and Research Center", "");
-    clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
-    clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
-    clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
-    clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
-    clean_cust = clean_cust.replaceAll(" Multispeciality", "");
-    clean_cust = clean_cust.replaceAll(" Multispecialty", "");
-    clean_cust = clean_cust.replaceAll(" Superspeciality", "");
-    clean_cust = clean_cust.replaceAll(" Super Speciality", "");
-    clean_cust = clean_cust.trim();
-    
-    if(clean_cust.length() > 30)
+    // Extract first 3 words of Customer
+    clean_cust = "";
+    c_words = cust_raw.toList(" ");
+    if(c_words.size() > 3)
     {
-        c_words = clean_cust.toList(" ");
-        if(c_words.size() > 3)
-        {
-            clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
-        }
+        clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+    }
+    else
+    {
+        clean_cust = cust_raw;
     }
     
-    input.Agreement_Title = clean_cust + " - " + clean_item;
+    // Clean item name
+    clean_item = item_raw;
+    clean_item = clean_item.replaceAll("™", "");
+    clean_item = clean_item.replaceAll("®", "");
+    clean_item = clean_item.replaceAll("Rental - ", "");
+    clean_item = clean_item.replaceAll("Rental -", "");
+    clean_item = clean_item.replaceAll("Rental ", "");
+    clean_item = clean_item.trim();
+    
+    // Calculate Count + 1
+    existing_agreements = Rental_Agreements[Customer == target_cust_id && ID != curr_id];
+    next_num = existing_agreements.count() + 1;
+    
+    input.Agreement_Title = clean_cust + " - " + clean_item + " #" + next_num;
+}
+
+// 4. Strict Uniqueness Check on Agreement Title
+target_title = input.Agreement_Title.trim();
+existing_title = Rental_Agreements[Agreement_Title == target_title && ID != curr_id];
+if(existing_title.count() > 0)
+{
+    alert "Duplicate Agreement Title:\n\nAn agreement with the title '" + target_title + "' already exists in the system.\n\nPlease enter a unique title or adjust the sequence number.";
+    cancel submit;
 }
 
 // 5. Ensure Agreement Status is set
@@ -120,21 +96,13 @@ if(input.Agreement_Status == null)
 }
 
 // 6. Duplicate Guard for Daily (Pay-Per-Use) Agreements
-if(input.Billing_Unit == "Day")
+target_item_id = input.Rental_Item;
+item_check = Rental_Items[ID == target_item_id];
+if(item_check != null && item_check.Billing_Unit == "Day")
 {
     target_cust_id = input.Customer;
-    target_item_id = input.Rental_Item;
     
-    existing_active = null;
-    if(input.ID == null)
-    {
-        existing_active = Rental_Agreements[Customer == target_cust_id && Rental_Item == target_item_id && Agreement_Status == "Active"];
-    }
-    else
-    {
-        curr_id = input.ID;
-        existing_active = Rental_Agreements[Customer == target_cust_id && Rental_Item == target_item_id && Agreement_Status == "Active" && ID != curr_id];
-    }
+    existing_active = Rental_Agreements[Customer == target_cust_id && Rental_Item == target_item_id && Agreement_Status == "Active" && ID != curr_id];
     
     if(existing_active != null && existing_active.count() > 0)
     {

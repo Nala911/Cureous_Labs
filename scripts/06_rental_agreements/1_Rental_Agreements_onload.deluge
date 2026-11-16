@@ -3,12 +3,11 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/06_rental_agreements/1_Rental_Agreements_onload.deluge
-// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Title, Agreement_Start_Date, Billing_Unit, Agreement_Status, Agreement_End_Date, Security_Deposit]
+// Fields Used  : [Customer, Rental_Item, Agreed_Rate, Agreement_Title, Agreement_Start_Date, Agreement_Status, Agreement_End_Date, Security_Deposit]
 // Cross-Forms  : None
 // Purpose      : Intelligent Form UX: In Add mode, user entry fields are Customer,
 //                Rental Item, Agreed Rate, Agreement Title (editable), and Agreement
-//                Start Date (editable, defaulted to today). Billing Unit is hidden
-//                completely from the form (auto-derived in background from Rental Item).
+//                Start Date (editable, defaulted to today).
 //                Irrelevant fields (Agreement Status, Agreement End Date, Security
 //                Deposit) are hidden.
 //                In Edit mode, locks contract identity while allowing rate, title,
@@ -37,11 +36,7 @@ if(input.ID == null)
     enable Agreement_Start_Date;
     show Agreement_Start_Date;
     
-    // 2. Background Field: Hidden and disabled (Auto-derived from Rental Items, zero UI clutter)
-    hide Billing_Unit;
-    disable Billing_Unit;
-    
-    // 3. Hidden Lifecycle Fields: Irrelevant on initial creation
+    // 2. Hidden Lifecycle Fields: Irrelevant on initial creation
     hide Agreement_Status;
     hide Agreement_End_Date;
     hide Security_Deposit;
@@ -52,13 +47,9 @@ if(input.ID == null)
 }
 else
 {
-    // 4. EDIT Mode: Contract identity is immutable (Rental_Agreement_ID is natively locked Auto-Number)
+    // 3. EDIT Mode: Contract identity is immutable (Customer and Rental_Item locked)
     disable Customer;
     disable Rental_Item;
-    
-    // Background field stays hidden
-    hide Billing_Unit;
-    disable Billing_Unit;
     
     // Commercial, operational, and lifecycle parameters can be adjusted
     enable Agreed_Rate;

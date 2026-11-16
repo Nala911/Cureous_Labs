@@ -3,15 +3,16 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/08_bed_stations/1_Bed_Stations_onload.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Deployment_End_Date]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Customer, Bed_Station_Title, Control_Unit, Overlay_Asset, Deployment_Start_Date, Deployment_Status, Deployment_End_Date, Swap, Swap_Reason]
 // Cross-Forms  : [Bed_Stations, Devices]
 // Purpose      : Configures dynamic UI visibility and field states based on Add vs Edit
 //                mode. In Add mode, defaults Deployment_Type to "Rental", enables
 //                interactive fields, disables context fields, and defaults start date
-//                and status. In Edit mode, locks contract, customer, mode, and closure
-//                fields. If Deployment_Status == "Active", enables Control Unit and
-//                Overlay lookups for native bedside hardware swapping, loading customer
-//                buffer inventory plus currently coupled units. If Closed, locks lookups.
+//                and status; hides Swap and Swap_Reason. In Edit mode, locks contract,
+//                customer, mode, and closure fields. If Deployment_Status == "Active",
+//                shows Swap toggle (default false), hides Swap_Reason, and populates
+//                Control Unit and Overlay choices with available buffer inventory in
+//                Ready Condition plus currently coupled units. If Closed, locks lookups.
 // Optimization : Targeted indexed query outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
@@ -56,6 +57,12 @@ if(input.ID == null)
     hide Deployment_End_Date;
     disable Deployment_End_Date;
     input.Deployment_End_Date = null;
+    
+    // Swap Hardware Controls: Hidden on initial Add
+    hide Swap;
+    hide Swap_Reason;
+    input.Swap = false;
+    input.Swap_Reason = "";
 }
 else
 {
@@ -92,6 +99,15 @@ else
     // Native Bedside Swapping: If station is Active, enable hardware lookups and populate available choices
     if(input.Deployment_Status == "Active")
     {
+        // Reveal Swap Mode Toggle (default: false / unchecked)
+        show Swap;
+        enable Swap;
+        input.Swap = false;
+        
+        // Swap Reason is hidden until Swap toggle is checked
+        hide Swap_Reason;
+        input.Swap_Reason = "";
+        
         enable Control_Unit;
         enable Overlay_Asset;
         
@@ -100,6 +116,10 @@ else
             cust_id = input.Customer;
             curr_id = input.ID;
             status_val = "Active";
+            ready_cu_stage = "6 - CU Ready Condition";
+            ready_ov_stage = "6 - OV Ready Condition";
+            curr_cu_id = input.Control_Unit;
+            curr_ov_id = input.Overlay_Asset;
             
             // Collect hardware IDs already deployed on OTHER active bed stations at this facility
             active_cu_ids = Bed_Stations[Customer == cust_id && Deployment_Status == status_val && ID != curr_id].Control_Unit.getAll();
@@ -111,13 +131,16 @@ else
             all_cu_recs = Devices[Current_Customer == cust_id && Device_Type == cu_type];
             all_ov_recs = Devices[Current_Customer == cust_id && Device_Type == ov_type];
             
-            // Build available lists (buffer units + currently coupled units)
+            // Build available lists (buffer units in Ready Condition + currently coupled units)
             avail_cu_ids = list();
             for each cu in all_cu_recs
             {
                 if(!active_cu_ids.contains(cu.ID))
                 {
-                    avail_cu_ids.add(cu.ID);
+                    if(cu.Device_Stage == ready_cu_stage || cu.ID == curr_cu_id)
+                    {
+                        avail_cu_ids.add(cu.ID);
+                    }
                 }
             }
             
@@ -126,7 +149,10 @@ else
             {
                 if(!active_ov_ids.contains(ov.ID))
                 {
-                    avail_ov_ids.add(ov.ID);
+                    if(ov.Device_Stage == ready_ov_stage || ov.ID == curr_ov_id)
+                    {
+                        avail_ov_ids.add(ov.ID);
+                    }
                 }
             }
             
@@ -136,8 +162,12 @@ else
     }
     else
     {
-        // When Closed or Inactive, lock hardware pairings
+        // When Closed or Inactive, lock hardware pairings and hide swap controls
         disable Control_Unit;
         disable Overlay_Asset;
+        hide Swap;
+        hide Swap_Reason;
+        input.Swap = false;
+        input.Swap_Reason = "";
     }
 }

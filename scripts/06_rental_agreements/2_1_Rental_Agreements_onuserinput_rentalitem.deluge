@@ -3,14 +3,14 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Rental_Item -> On User Input
 // File Path    : scripts/06_rental_agreements/2_1_Rental_Agreements_onuserinput_rentalitem.deluge
-// Fields Used  : [Rental_Item, Customer, Billing_Unit, Agreement_Start_Date, Agreement_Title]
-// Cross-Forms  : [Rental_Items, Customers]
+// Fields Used  : [Rental_Item, Customer, Agreement_Start_Date, Agreement_Title]
+// Cross-Forms  : [Rental_Items, Customers, Rental_Agreements]
 // Purpose      : When Rental Item is selected:
 //                1. Defaults Agreement_Start_Date to today if empty.
-//                2. Pulls Billing_Unit ("Day" or "Month") from Rental_Items silently in background.
-//                3. Auto-fills simplified, readable Agreement_Title using smart auto-cleaning:
-//                   strips "Rental -" & "™", cleans legal customer suffixes, leaving user free to edit.
-// Optimization : Single indexed lookup on Rental_Items and Customers. Law 1 compliant.
+//                2. Auto-fills simplified, readable Agreement_Title:
+//                   First 3 words of Customer + Clean Rental Item + #[Count+1] sequence,
+//                   leaving user free to edit.
+// Optimization : Targeted indexed queries outside criteria brackets. Law 1 compliant.
 // ==============================================================================
 
 if(input.Rental_Item != null)
@@ -21,99 +21,70 @@ if(input.Rental_Item != null)
         input.Agreement_Start_Date = zoho.currentdate;
     }
     
-    // 2. Fetch Rental Items details and silently populate Billing Unit in the background
+    // 2. Fetch Rental Items details for clean title generation
     target_item_id = input.Rental_Item;
     item_rec = Rental_Items[ID == target_item_id];
     if(item_rec != null && item_rec.count() > 0)
     {
         item_name = ifnull(item_rec.Item_Name, "");
-        b_unit = ifnull(item_rec.Billing_Unit, "");
         
-        if(b_unit != null && b_unit != "")
-        {
-            input.Billing_Unit = b_unit;
-        }
-        else if(item_name.toLowerCase().contains("monthly") || item_name.toLowerCase().contains("month"))
-        {
-            input.Billing_Unit = "Month";
-        }
-        else
-        {
-            input.Billing_Unit = "Day";
-        }
-        
-        // 3. Clean Item Name (strip "Rental - ", symbols, and normalize cadence tag)
+        // Clean Item Name (strip "Rental - ", symbols, and format clean model + cadence)
         clean_item = item_name;
-        clean_item = clean_item.replaceAll("Rental - ", "");
-        clean_item = clean_item.replaceAll("Rental -", "");
         clean_item = clean_item.replaceAll("™", "");
         clean_item = clean_item.replaceAll("®", "");
-        clean_item = clean_item.replaceAll(" - Monthly", " (Monthly)");
-        clean_item = clean_item.replaceAll("- Monthly", " (Monthly)");
-        clean_item = clean_item.replaceAll(" - Daily", " (Daily)");
-        clean_item = clean_item.replaceAll("- Daily", " (Daily)");
+        clean_item = clean_item.replaceAll("Rental - ", "");
+        clean_item = clean_item.replaceAll("Rental -", "");
+        clean_item = clean_item.replaceAll("Rental ", "");
         clean_item = clean_item.trim();
         
-        // 4. Clean Customer Name (strip legal suffixes and prevent excessive length)
+        // 4. Extract First 3 Words of Customer Name
         clean_cust = "";
+        next_num = 1;
         if(input.Customer != null)
         {
             cust_id = input.Customer;
             cust_rec = Customers[ID == cust_id];
-            cust_raw = ifnull(cust_rec.Customer_Name, "");
-            
-            clean_cust = cust_raw;
-            clean_cust = clean_cust.replaceAll(" Private Limited", "");
-            clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
-            clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
-            clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
-            clean_cust = clean_cust.replaceAll(" Limited", "");
-            clean_cust = clean_cust.replaceAll(" Ltd.", "");
-            clean_cust = clean_cust.replaceAll(" Ltd", "");
-            clean_cust = clean_cust.replaceAll(" & Research Centre", "");
-            clean_cust = clean_cust.replaceAll(" and Research Centre", "");
-            clean_cust = clean_cust.replaceAll(" & Research Center", "");
-            clean_cust = clean_cust.replaceAll(" and Research Center", "");
-            clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
-            clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
-            clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
-            clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
-            clean_cust = clean_cust.replaceAll(" Multispeciality", "");
-            clean_cust = clean_cust.replaceAll(" Multispecialty", "");
-            clean_cust = clean_cust.replaceAll(" Superspeciality", "");
-            clean_cust = clean_cust.replaceAll(" Super Speciality", "");
-            clean_cust = clean_cust.trim();
-            
-            if(clean_cust.length() > 30)
+            if(cust_rec != null && cust_rec.count() > 0)
             {
-                c_words = clean_cust.toList(" ");
+                cust_raw = ifnull(cust_rec.Customer_Name, "").trim();
+                c_words = cust_raw.toList(" ");
                 if(c_words.size() > 3)
                 {
                     clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
                 }
+                else
+                {
+                    clean_cust = cust_raw;
+                }
             }
+            
+            // Calculate Count + 1 of existing agreements for this Customer
+            curr_id = 0;
+            if(input.ID != null)
+            {
+                curr_id = input.ID;
+            }
+            existing_agreements = Rental_Agreements[Customer == cust_id && ID != curr_id];
+            next_num = existing_agreements.count() + 1;
         }
         
-        // 5. Compose concise, readable Agreement Title
+        // 5. Compose concise, readable Agreement Title (Customer 3 words - Clean Item #Count+1)
         if(clean_cust != "" && clean_item != "")
         {
-            input.Agreement_Title = clean_cust + " - " + clean_item;
+            input.Agreement_Title = clean_cust + " - " + clean_item + " #" + next_num;
         }
         else if(clean_cust != "")
         {
-            input.Agreement_Title = clean_cust;
+            input.Agreement_Title = clean_cust + " #" + next_num;
         }
         else
         {
-            input.Agreement_Title = clean_item;
+            input.Agreement_Title = clean_item + " #" + next_num;
         }
     }
 }
 else
 {
-    // Selection cleared: Reset derived fields
-    input.Billing_Unit = null;
-    
     // Retain clean customer name if Customer is still selected, else clear
     if(input.Customer != null)
     {

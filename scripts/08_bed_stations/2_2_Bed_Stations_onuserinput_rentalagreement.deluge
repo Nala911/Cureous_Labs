@@ -26,7 +26,7 @@ if(input.Rental_Agreement != null)
         // 1. Auto-populate Customer lookup
         input.Customer = agr_rec.Customer;
         
-        // 2. Resolve and Clean Customer Name for Title pre-fill
+        // 2. Extract First 3 Words of Customer Name
         clean_cust = "";
         cust_name = "";
         if(agr_rec.Customer != null)
@@ -35,48 +35,36 @@ if(input.Rental_Agreement != null)
             cust_rec = Customers[ID == cust_id];
             if(cust_rec.count() > 0)
             {
-                cust_raw = ifnull(cust_rec.Customer_Name, "");
+                cust_raw = ifnull(cust_rec.Customer_Name, "").trim();
                 cust_name = cust_raw;
                 
-                clean_cust = cust_raw;
-                clean_cust = clean_cust.replaceAll(" Private Limited", "");
-                clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
-                clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
-                clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
-                clean_cust = clean_cust.replaceAll(" Limited", "");
-                clean_cust = clean_cust.replaceAll(" Ltd.", "");
-                clean_cust = clean_cust.replaceAll(" Ltd", "");
-                clean_cust = clean_cust.replaceAll(" & Research Centre", "");
-                clean_cust = clean_cust.replaceAll(" and Research Centre", "");
-                clean_cust = clean_cust.replaceAll(" & Research Center", "");
-                clean_cust = clean_cust.replaceAll(" and Research Center", "");
-                clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
-                clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
-                clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
-                clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
-                clean_cust = clean_cust.replaceAll(" Multispeciality", "");
-                clean_cust = clean_cust.replaceAll(" Multispecialty", "");
-                clean_cust = clean_cust.replaceAll(" Superspeciality", "");
-                clean_cust = clean_cust.replaceAll(" Super Speciality", "");
-                clean_cust = clean_cust.trim();
-                
-                if(clean_cust.length() > 30)
+                c_words = cust_raw.toList(" ");
+                if(c_words.size() > 3)
                 {
-                    c_words = clean_cust.toList(" ");
-                    if(c_words.size() > 3)
-                    {
-                        clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
-                    }
+                    clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+                }
+                else
+                {
+                    clean_cust = cust_raw;
                 }
             }
         }
         
-        // 3. Pre-fill Bed Station Title if empty (leaves user free to customize ward/bed)
+        // 3. Pre-fill Bed Station Title if empty (First 3 words + #[Count+1], editable by staff)
         if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
         {
             if(clean_cust != "")
             {
-                input.Bed_Station_Title = clean_cust + " - Bed";
+                c_target_id = input.Customer;
+                curr_bed_id = 0;
+                if(input.ID != null)
+                {
+                    curr_bed_id = input.ID;
+                }
+                existing_beds = Bed_Stations[Customer == c_target_id && ID != curr_bed_id];
+                next_bed_num = existing_beds.count() + 1;
+                
+                input.Bed_Station_Title = clean_cust + " #" + next_bed_num;
             }
         }
         
@@ -102,11 +90,14 @@ if(input.Rental_Agreement != null)
             all_cu_recs = Devices[Current_Customer == c_target && Device_Type == cu_type];
             all_ov_recs = Devices[Current_Customer == c_target && Device_Type == ov_type];
             
-            // Filter strictly available units (exclude active units on other stations)
+            ready_cu_stage = "6 - CU Ready Condition";
+            ready_ov_stage = "6 - OV Ready Condition";
+            
+            // Filter strictly available units in Ready Condition (exclude active units and defective units)
             avail_cu_ids = list();
             for each cu in all_cu_recs
             {
-                if(!active_cu_ids.contains(cu.ID))
+                if(!active_cu_ids.contains(cu.ID) && cu.Device_Stage == ready_cu_stage)
                 {
                     avail_cu_ids.add(cu.ID);
                 }
@@ -115,7 +106,7 @@ if(input.Rental_Agreement != null)
             avail_ov_ids = list();
             for each ov in all_ov_recs
             {
-                if(!active_ov_ids.contains(ov.ID))
+                if(!active_ov_ids.contains(ov.ID) && ov.Device_Stage == ready_ov_stage)
                 {
                     avail_ov_ids.add(ov.ID);
                 }
@@ -139,18 +130,23 @@ if(input.Rental_Agreement != null)
         }
         
         // 5. Fixed Monthly Agreement Active Station Check (Advisory Notice)
-        if(agr_rec.Billing_Unit == "Month")
+        if(agr_rec.Rental_Item != null)
         {
-            curr_id = 0;
-            if(input.ID != null)
+            r_item_id = agr_rec.Rental_Item;
+            r_item = Rental_Items[ID == r_item_id];
+            if(r_item != null && r_item.Billing_Unit == "Month")
             {
-                curr_id = input.ID;
-            }
-            status_active = "Active";
-            existing_active = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == status_active && ID != curr_id];
-            if(existing_active.count() > 0)
-            {
-                alert "Notice for Fixed Monthly Contract:\n\nAgreement '" + agr_rec.Agreement_Title + "' already has an Active Bed Station assigned:\n" + existing_active.Bed_Station_ID.getAll() + " (" + existing_active.Bed_Station_Title.getAll() + ").\n\nFixed Monthly agreements typically cover strictly 1 active station at a time. If you deploy a second station, please ensure a separate agreement is created or switch to a Daily agreement.";
+                curr_id = 0;
+                if(input.ID != null)
+                {
+                    curr_id = input.ID;
+                }
+                status_active = "Active";
+                existing_active = Bed_Stations[Rental_Agreement == agr_id && Deployment_Status == status_active && ID != curr_id];
+                if(existing_active.count() > 0)
+                {
+                    alert "Notice for Fixed Monthly Contract:\n\nAgreement '" + agr_rec.Agreement_Title + "' already has an Active Bed Station assigned:\n" + existing_active.Bed_Station_Title.getAll() + ".\n\nFixed Monthly agreements typically cover strictly 1 active station at a time. If you deploy a second station, please ensure a separate agreement is created or switch to a Daily agreement.";
+                }
             }
         }
     }

@@ -25,9 +25,14 @@ else
         {
             ag_id = b_rec.Rental_Agreement;
             ag_rec = Rental_Agreements[ID == ag_id];
-            if(ag_rec != null && ag_rec.Billing_Unit == "Month")
+            if(ag_rec != null && ag_rec.Rental_Item != null)
             {
-                is_monthly = true;
+                r_item_id = ag_rec.Rental_Item;
+                r_item = Rental_Items[ID == r_item_id];
+                if(r_item != null && r_item.Billing_Unit == "Month")
+                {
+                    is_monthly = true;
+                }
             }
         }
     }

@@ -22,49 +22,34 @@ if(input.Customer != null)
     cust_rec = Customers[ID == cust_id];
     cust_name = "";
     clean_cust = "";
-    if(cust_rec.count() > 0)
+    cust_raw = ifnull(cust_rec.Customer_Name, "").trim();
+    cust_name = cust_raw;
+    
+    // Extract first 3 words of Customer
+    c_words = cust_raw.toList(" ");
+    if(c_words.size() > 3)
     {
-        cust_raw = ifnull(cust_rec.Customer_Name, "");
-        cust_name = cust_raw;
-        
+        clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
+    }
+    else
+    {
         clean_cust = cust_raw;
-        clean_cust = clean_cust.replaceAll(" Private Limited", "");
-        clean_cust = clean_cust.replaceAll(" Pvt Ltd", "");
-        clean_cust = clean_cust.replaceAll(" Pvt. Ltd.", "");
-        clean_cust = clean_cust.replaceAll(" Pvt. Ltd", "");
-        clean_cust = clean_cust.replaceAll(" Limited", "");
-        clean_cust = clean_cust.replaceAll(" Ltd.", "");
-        clean_cust = clean_cust.replaceAll(" Ltd", "");
-        clean_cust = clean_cust.replaceAll(" & Research Centre", "");
-        clean_cust = clean_cust.replaceAll(" and Research Centre", "");
-        clean_cust = clean_cust.replaceAll(" & Research Center", "");
-        clean_cust = clean_cust.replaceAll(" and Research Center", "");
-        clean_cust = clean_cust.replaceAll(" Multispeciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Multispecialty Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Super Speciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Superspeciality Hospital", " Hospital");
-        clean_cust = clean_cust.replaceAll(" Multispeciality", "");
-        clean_cust = clean_cust.replaceAll(" Multispecialty", "");
-        clean_cust = clean_cust.replaceAll(" Superspeciality", "");
-        clean_cust = clean_cust.replaceAll(" Super Speciality", "");
-        clean_cust = clean_cust.trim();
-        
-        if(clean_cust.length() > 30)
-        {
-            c_words = clean_cust.toList(" ");
-            if(c_words.size() > 3)
-            {
-                clean_cust = c_words.get(0) + " " + c_words.get(1) + " " + c_words.get(2);
-            }
-        }
     }
     
-    // 1. Pre-fill Bed Station Title if empty (Clean Customer - Bed)
+    // 1. Pre-fill Bed Station Title if empty (First 3 words + #[Count+1], editable by staff)
+    curr_bed_id = 0;
+    if(input.ID != null)
+    {
+        curr_bed_id = input.ID;
+    }
+    existing_beds = Bed_Stations[Customer == cust_id && ID != curr_bed_id];
+    next_bed_num = existing_beds.count() + 1;
+    
     if(input.Bed_Station_Title == null || input.Bed_Station_Title.trim() == "")
     {
         if(clean_cust != "")
         {
-            input.Bed_Station_Title = clean_cust + " - Bed";
+            input.Bed_Station_Title = clean_cust + " #" + next_bed_num;
         }
     }
     
@@ -83,11 +68,14 @@ if(input.Customer != null)
     all_cu_recs = Devices[Current_Customer == cust_id && Device_Type == "Control Unit"];
     all_ov_recs = Devices[Current_Customer == cust_id && Device_Type == "Overlay"];
     
-    // Filter strictly available units
+    ready_cu_stage = "6 - CU Ready Condition";
+    ready_ov_stage = "6 - OV Ready Condition";
+    
+    // Filter strictly available units in Ready Condition (exclude active units and defective units)
     avail_cu_ids = list();
     for each cu in all_cu_recs
     {
-        if(!active_cu_ids.contains(cu.ID))
+        if(!active_cu_ids.contains(cu.ID) && cu.Device_Stage == ready_cu_stage)
         {
             avail_cu_ids.add(cu.ID);
         }
@@ -96,7 +84,7 @@ if(input.Customer != null)
     avail_ov_ids = list();
     for each ov in all_ov_recs
     {
-        if(!active_ov_ids.contains(ov.ID))
+        if(!active_ov_ids.contains(ov.ID) && ov.Device_Stage == ready_ov_stage)
         {
             avail_ov_ids.add(ov.ID);
         }

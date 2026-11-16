@@ -1,0 +1,23 @@
+// ==============================================================================
+// Module Name  : Bed Stations (Form Link Name: Bed_Stations)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Swap -> On User Input
+// File Path    : scripts/08_bed_stations/2_5_Bed_Stations_onuserinput_swap.deluge
+// Fields Used  : [Swap, Swap_Reason]
+// Cross-Forms  : None
+// Purpose      : Toggles Hardware Swap Mode in Edit mode. When enabled, reveals
+//                the mandatory Swap_Reason field to document the replacement cause
+//                (e.g., breakdown or defect). When disabled, hides and clears reason.
+// Optimization : Instant UI toggle. Zero database queries.
+// ==============================================================================
+
+if(input.Swap == true)
+{
+    show Swap_Reason;
+    enable Swap_Reason;
+}
+else
+{
+    hide Swap_Reason;
+    input.Swap_Reason = "";
+}

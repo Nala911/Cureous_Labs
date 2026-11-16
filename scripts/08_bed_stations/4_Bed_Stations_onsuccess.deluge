@@ -3,14 +3,13 @@
 // Script Type  : Form Workflow (On Success)
 // Trigger Hook : Created or Edited -> Form Actions -> On Success
 // File Path    : scripts/08_bed_stations/4_Bed_Stations_onsuccess.deluge
-// Fields Used  : [Deployment_Type, Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date, Bed_Station_ID, Bed_Station_Title]
+// Fields Used  : [Deployment_Type, Rental_Agreement, Control_Unit, Overlay_Asset, Deployment_Status, Customer, Deployment_Start_Date, Deployment_End_Date]
 // Cross-Forms  : [Devices, Bed_Stations]
 // Purpose      : Executes synchronized downstream updates on form submission:
 //                1. Updates physical hardware custody and Rental State in Devices.
 //                2. Reconciles bedside hardware swaps: marks newly coupled units Active
 //                   and safely resets any replaced/unassigned buffer units to Inactive.
-//                3. Appends system-generated Bed_Station_ID to Bed_Station_Title.
-//                4. Navigates cleanly to the 'All_Bed_Stations' report view.
+//                3. Navigates cleanly to the 'All_Bed_Stations' report view.
 // Optimization : Atomic updates with targeted criteria outside brackets. Law 1 compliant.
 // ==============================================================================
 
@@ -78,20 +77,5 @@ if(input.Customer != null)
     }
 }
 
-// 3. Ensure Bed Station Title includes generated Bed Station ID (e.g. #BST-0001)
-if(input.Bed_Station_ID != null)
-{
-    bst_rec = Bed_Stations[ID == current_station_id];
-    if(bst_rec.count() > 0)
-    {
-        curr_title = ifnull(bst_rec.Bed_Station_Title, "");
-        bst_id_str = input.Bed_Station_ID.toString();
-        if(curr_title != "" && !curr_title.contains(bst_id_str))
-        {
-            bst_rec.Bed_Station_Title = curr_title + " #" + bst_id_str;
-        }
-    }
-}
-
-// 4. Redirect cleanly to the All_Bed_Stations report view
+// 3. Redirect cleanly to the All_Bed_Stations report view
 openUrl("#Report:All_Bed_Stations", "same window");
