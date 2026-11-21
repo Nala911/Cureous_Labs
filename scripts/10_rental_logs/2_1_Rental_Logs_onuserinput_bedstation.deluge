@@ -3,20 +3,25 @@
 // Script Type  : Form Workflow
 // Trigger Hook : Created or Edited -> Field Actions -> Bed_Station -> On User Input
 // File Path    : scripts/10_rental_logs/2_1_Rental_Logs_onuserinput_bedstation.deluge
-// Fields Used  : [Bed_Station, Control_Unit, Overlay, Agreed_Rate, Usage_Start_Date, Usage_End_Date, Number_of_Days, Taxable_Value]
-// Cross-Forms  : [Bed_Stations, Rental_Agreements]
-// Purpose      : Auto-populates active paired Devices and Agreed Rate when Bed Station is selected.
-//                Triggers commercial calculation if usage dates are present.
+// Fields Used  : [Bed_Station, Customer, Rental_Agreement, Rental_Item, Billing_Type, Control_Unit, Overlay, Agreed_Rate, Days_Used, Taxable_Value, Usage_Start_Date, Usage_End_Date]
+// Cross-Forms  : [Bed_Stations, Rental_Agreements, Rental_Items]
+// Purpose      : Auto-populates Customer, Rental Agreement, Rental Item, Billing Type,
+//                active paired hardware (Control Unit and Overlay), and commercial Agreed Rate
+//                when Bed Station is selected. Triggers initial commercial calculations.
 // Optimization : Single-record direct lookups outside criteria brackets; zero in-loop queries.
 // ==============================================================================
 
 if(input.Bed_Station == null)
 {
-    // Clear dependent context fields
+    // Clear dependent context and hardware fields
+    input.Customer = null;
+    input.Rental_Agreement = null;
+    input.Rental_Item = null;
+    input.Billing_Type = null;
     input.Control_Unit = null;
     input.Overlay = null;
     input.Agreed_Rate = null;
-    input.Number_of_Days = null;
+    input.Days_Used = null;
     input.Taxable_Value = null;
 }
 else
@@ -27,13 +32,13 @@ else
     
     if(bed_rec != null)
     {
-        // Auto-populate active paired hardware
+        // Auto-populate customer and active paired hardware
+        input.Customer = bed_rec.Customer;
+        input.Rental_Agreement = bed_rec.Rental_Agreement;
         input.Control_Unit = bed_rec.Control_Unit;
         input.Overlay = bed_rec.Overlay_Asset;
         
-        is_monthly = false;
-        
-        // Step 2: Query linked Rental Agreement for commercial rate and mode
+        // Step 2: Query linked Rental Agreement for commercial rate and rental item
         if(bed_rec.Rental_Agreement != null)
         {
             target_agmt_id = bed_rec.Rental_Agreement;
@@ -42,34 +47,45 @@ else
             if(agmt_rec != null)
             {
                 input.Agreed_Rate = agmt_rec.Agreed_Rate;
+                input.Rental_Item = agmt_rec.Rental_Item;
+                
+                // Step 3: Determine billing cadence from Rental Item
                 if(agmt_rec.Rental_Item != null)
                 {
                     r_item_id = agmt_rec.Rental_Item;
                     r_item = Rental_Items[ID == r_item_id];
+                    
                     if(r_item != null && r_item.Billing_Unit == "Month")
                     {
-                        is_monthly = true;
+                        input.Billing_Type = "Fixed (Monthly)";
+                    }
+                    else
+                    {
+                        input.Billing_Type = "Pay-Per-Use (Daily)";
                     }
                 }
             }
         }
         
-        // Step 3: Recalculate billing values if usage dates are already entered
+        // Step 4: Recalculate billing values if usage dates are already entered
         if(input.Usage_Start_Date != null && input.Usage_End_Date != null && input.Agreed_Rate != null)
         {
             if(input.Usage_End_Date >= input.Usage_Start_Date)
             {
-                diff_days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date);
-                calculated_days = diff_days + 1;
-                input.Number_of_Days = calculated_days;
+                tot_days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
                 
-                if(is_monthly)
+                if(input.Days_Used == null || input.Days_Used <= 0 || input.Days_Used > tot_days)
+                {
+                    input.Days_Used = tot_days;
+                }
+                
+                if(input.Billing_Type == "Fixed (Monthly)")
                 {
                     input.Taxable_Value = input.Agreed_Rate;
                 }
                 else
                 {
-                    input.Taxable_Value = calculated_days * input.Agreed_Rate;
+                    input.Taxable_Value = input.Days_Used * input.Agreed_Rate;
                 }
             }
         }

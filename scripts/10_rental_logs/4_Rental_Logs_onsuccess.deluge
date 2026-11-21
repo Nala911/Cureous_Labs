@@ -1,0 +1,12 @@
+// ==============================================================================
+// Module Name  : Rental Logs (Form Link Name: Rental_Logs)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Created or Edited -> Form Actions -> On Success
+// File Path    : scripts/10_rental_logs/4_Rental_Logs_onsuccess.deluge
+// Fields Used  : None
+// Cross-Forms  : None
+// Purpose      : Smoothly redirects the user back to the primary Rental Logs report view.
+// Optimization : Zero database overhead.
+// ==============================================================================
+
+openUrl("#Report:All_Rental_Logs", "same window");

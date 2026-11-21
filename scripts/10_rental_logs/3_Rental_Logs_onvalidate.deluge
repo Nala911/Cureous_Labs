@@ -3,8 +3,8 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/10_rental_logs/3_Rental_Logs_onvalidate.deluge
-// Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Agreed_Rate, Number_of_Days, Taxable_Value, Billing_Status]
-// Cross-Forms  : [Rental_Logs, Bed_Stations, Rental_Agreements]
+// Fields Used  : [Bed_Station, Control_Unit, Overlay, Usage_Start_Date, Usage_End_Date, Days_Used, Billing_Type, Agreed_Rate, Taxable_Value, Billing_Status]
+// Cross-Forms  : [Rental_Logs]
 // Purpose      : Enforces mandatory inputs, validates chronological dates and positive rates,
 //                guards against overlapping billing intervals for the same bed station, and
 //                ensures mathematical integrity of taxable base calculation.
@@ -48,6 +48,12 @@ if(input.Usage_End_Date == null)
     cancel submit;
 }
 
+if(input.Days_Used == null)
+{
+    alert "Validation Error:\n\nPlease enter the number of Days Used.";
+    cancel submit;
+}
+
 // 2. Chronological Date Order Guard
 if(input.Usage_End_Date < input.Usage_Start_Date)
 {
@@ -55,14 +61,29 @@ if(input.Usage_End_Date < input.Usage_Start_Date)
     cancel submit;
 }
 
-// 3. Commercial Rate & Duration Validation
+// 3. Days Used Bounds Verification
+tot_days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
+
+if(input.Days_Used <= 0)
+{
+    alert "Validation Error:\n\nDays Used must be at least 1 day.";
+    cancel submit;
+}
+
+if(input.Days_Used > tot_days)
+{
+    alert "Validation Error:\n\nDays Used (" + input.Days_Used + ") cannot exceed total Calendar Days in the period (" + tot_days + ").";
+    cancel submit;
+}
+
+// 4. Commercial Rate Validation
 if(input.Agreed_Rate == null || input.Agreed_Rate <= 0)
 {
     alert "Validation Error:\n\nPlease enter a valid positive Agreed Rate.";
     cancel submit;
 }
 
-// 4. Overlap Guard (Prevent Duplicate Billing Periods on Same Bed Station)
+// 5. Overlap Guard (Prevent Duplicate Billing Periods on Same Bed Station)
 target_bed_id = input.Bed_Station;
 target_start = input.Usage_Start_Date;
 target_end = input.Usage_End_Date;
@@ -72,45 +93,44 @@ overlapping_logs = Rental_Logs[Bed_Station == target_bed_id && Usage_Start_Date 
 
 if(overlapping_logs.count() > 0)
 {
-    conflict_rec = overlapping_logs.get(0);
-    log_id_str = ifnull(conflict_rec.Rental_Log_ID, "Existing Log");
-    alert "Duplicate Billing Overlap Detected:\n\nAn active rental log (" + log_id_str + ") already exists for this Bed Station covering an overlapping date range (" + conflict_rec.Usage_Start_Date + " to " + conflict_rec.Usage_End_Date + ").\n\nPlease adjust the usage dates to prevent double-billing.";
-    cancel submit;
-}
-
-// 5. Mathematical Computation Fallback Guarantees
-if(input.Number_of_Days == null || input.Number_of_Days <= 0)
-{
-    input.Number_of_Days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
-}
-
-is_monthly = false;
-b_rec = Bed_Stations[ID == target_bed_id];
-if(b_rec != null && b_rec.Rental_Agreement != null)
-{
-    ag_id = b_rec.Rental_Agreement;
-    ag_rec = Rental_Agreements[ID == ag_id];
-    if(ag_rec != null && ag_rec.Rental_Item != null)
+    for each conflict_rec in overlapping_logs
     {
-        r_item_id = ag_rec.Rental_Item;
-        r_item = Rental_Items[ID == r_item_id];
-        if(r_item != null && r_item.Billing_Unit == "Month")
-        {
-            is_monthly = true;
-        }
+        log_id_str = ifnull(conflict_rec.Rental_Log_ID, "Existing Log");
+        alert "Duplicate Billing Overlap Detected:\n\nAn active rental log (" + log_id_str + ") already exists for this Bed Station covering an overlapping date range (" + conflict_rec.Usage_Start_Date + " to " + conflict_rec.Usage_End_Date + ").\n\nPlease adjust the usage dates to prevent double-billing.";
+        cancel submit;
     }
 }
 
-if(is_monthly)
+// 6. Mathematical Computation Fallback Guarantees
+if(input.Taxable_Value == null || input.Taxable_Value <= 0)
 {
-    input.Taxable_Value = input.Agreed_Rate;
-}
-else
-{
-    input.Taxable_Value = input.Number_of_Days * input.Agreed_Rate;
+    if(input.Billing_Type == "Fixed (Monthly)")
+    {
+        if(input.Days_Used < tot_days)
+        {
+            c_d = tot_days.toDecimal();
+            u_d = input.Days_Used.toDecimal();
+            r = input.Agreed_Rate.toDecimal();
+            input.Taxable_Value = ((r / c_d) * u_d).round(2);
+        }
+        else
+        {
+            input.Taxable_Value = input.Agreed_Rate;
+        }
+    }
+    else
+    {
+        input.Taxable_Value = input.Days_Used * input.Agreed_Rate;
+    }
 }
 
-// 6. Ensure default Billing Status
+if(input.Taxable_Value <= 0)
+{
+    alert "Validation Error:\n\nTaxable Value must be greater than zero.";
+    cancel submit;
+}
+
+// 7. Ensure default Billing Status
 if(input.Billing_Status == null || input.Billing_Status == "")
 {
     input.Billing_Status = "Pending Invoice";

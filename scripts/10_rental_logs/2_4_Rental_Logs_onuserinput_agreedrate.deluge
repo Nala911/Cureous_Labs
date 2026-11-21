@@ -1,0 +1,47 @@
+// ==============================================================================
+// Module Name  : Rental Logs (Form Link Name: Rental_Logs)
+// Script Type  : Form Workflow
+// Trigger Hook : Created or Edited -> Field Actions -> Agreed_Rate -> On User Input
+// File Path    : scripts/10_rental_logs/2_4_Rental_Logs_onuserinput_agreedrate.deluge
+// Fields Used  : [Agreed_Rate, Billing_Type, Days_Used, Usage_Start_Date, Usage_End_Date, Taxable_Value]
+// Cross-Forms  : None
+// Purpose      : Recalculates taxable value when Agreed Rate is updated by user.
+// Optimization : Mathematical in-memory evaluation with zero database queries.
+// ==============================================================================
+
+if(input.Agreed_Rate == null || input.Agreed_Rate <= 0)
+{
+    input.Taxable_Value = 0.00;
+}
+else
+{
+    if(input.Billing_Type == "Fixed (Monthly)")
+    {
+        tot_days = 0;
+        if(input.Usage_Start_Date != null && input.Usage_End_Date != null)
+        {
+            if(input.Usage_End_Date >= input.Usage_Start_Date)
+            {
+                tot_days = input.Usage_Start_Date.daysBetween(input.Usage_End_Date) + 1;
+            }
+        }
+        
+        if(tot_days > 0 && input.Days_Used != null && input.Days_Used < tot_days)
+        {
+            c_d = tot_days.toDecimal();
+            u_d = input.Days_Used.toDecimal();
+            r = input.Agreed_Rate.toDecimal();
+            input.Taxable_Value = ((r / c_d) * u_d).round(2);
+        }
+        else
+        {
+            input.Taxable_Value = input.Agreed_Rate;
+        }
+    }
+    else
+    {
+        // Pay-Per-Use (Daily)
+        days = ifnull(input.Days_Used, 1);
+        input.Taxable_Value = days * input.Agreed_Rate;
+    }
+}
