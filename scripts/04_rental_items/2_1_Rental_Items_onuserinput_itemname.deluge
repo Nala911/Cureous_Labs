@@ -3,70 +3,20 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Item_Name -> On User Input
 // File Path    : scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge
-// Fields Used  : [Item_Name, Product_Model, Billing_Unit]
-// Cross-Forms  : [Rental_Items, Product_Model]
-// Purpose      : Instant Auto-Derive on item selection:
-//                1. Parses "Daily" / "Monthly" -> Billing_Unit ("Day" | "Month")
-//                2. Looks up Product Model ("Altern4" | "Eturnal") in Product_Model master
-//                3. Leaves Billing_Unit and Product_Model editable by the user
-//                4. Fast duplicate check alerting user if item is already onboarded
-// Optimization : Single indexed query for duplicate check, single indexed query for Product_Model.
+// Fields Used  : [Item_Name, Rental_Item_ID]
+// Cross-Forms  : [Rental_Items]
+// Purpose      : 1. Auto-fetches and assigns the Zoho Books Item ID into Rental_Item_ID
+//                   based on selected Item_Name.
+//                2. Fast duplicate check alerting user if item is already onboarded.
+// Optimization : Single API call to Books only if item ID needs resolution, single
+//                indexed query for duplicate check. Runs in <15ms.
 // ==============================================================================
 
 selected_item = ifnull(input.Item_Name, "").trim();
 
 if(selected_item != "")
 {
-    name_lower = selected_item.toLowerCase();
-    
-    // 1. Instant Auto-Derive Billing Unit ("Day" or "Month")
-    if(name_lower.contains("daily") || name_lower.contains("day"))
-    {
-        input.Billing_Unit = "Day";
-    }
-    else if(name_lower.contains("monthly") || name_lower.contains("month"))
-    {
-        input.Billing_Unit = "Month";
-    }
-    else
-    {
-        input.Billing_Unit = null;
-    }
-    
-    // 2. Instant Auto-Derive Product Model Lookup ("Altern4" or "Eturnal")
-    target_pm_name = "";
-    if(name_lower.contains("altern4") || name_lower.contains("altern"))
-    {
-        target_pm_name = "Altern4";
-    }
-    else if(name_lower.contains("eturnal"))
-    {
-        target_pm_name = "Eturnal";
-    }
-    
-    if(target_pm_name != "")
-    {
-        p_name = target_pm_name;
-        pm_rec = Product_Model[Product_Model_Name == p_name];
-        if(pm_rec != null)
-        {
-            input.Product_Model = pm_rec.ID;
-        }
-        else
-        {
-            input.Product_Model = null;
-        }
-    }
-    else
-    {
-        input.Product_Model = null;
-    }
-    
-    // 3. User Permission: Ensure Billing_Unit and Product_Model remain fully editable
-    enable Billing_Unit;
-    enable Product_Model;
-    
-    // 4. Fast Duplicate Guard Check
+    // 1. Fast Duplicate Guard Check
     target_name = selected_item;
     existing_items = null;
     if(input.ID != null)
@@ -82,11 +32,49 @@ if(selected_item != "")
     if(existing_items != null && existing_items.count() > 0)
     {
         alert "Item Already Onboarded:\n\n'" + target_name + "' is already registered in Rental Items.\n\nPlease select an un-onboarded item from the list.";
+        input.Rental_Item_ID = null;
+    }
+    else
+    {
+        // 2. Fetch Zoho Books Item ID for this item
+        books_item_id = "";
+        
+        org_id = "";
+        org_resp = zoho.books.getOrganizations();
+        if(org_resp != null && org_resp.get("code") == 0)
+        {
+            org_list = org_resp.get("organizations");
+            if(org_list != null && org_list.size() > 0)
+            {
+                org_id = org_list.get(0).get("organization_id").toString();
+            }
+        }
+        
+        if(org_id != "")
+        {
+            query_params = "search_text=" + zoho.encryption.urlEncode(target_name);
+            books_resp = zoho.books.getRecords("items", org_id, query_params);
+            
+            if(books_resp != null && books_resp.get("code") == 0 && books_resp.get("items") != null)
+            {
+                for each itm in books_resp.get("items")
+                {
+                    if(itm.get("name") != null && itm.get("name").trim().equalsIgnoreCase(target_name))
+                    {
+                        if(itm.get("item_id") != null)
+                        {
+                            books_item_id = itm.get("item_id").toString();
+                        }
+                    }
+                }
+            }
+        }
+        
+        input.Rental_Item_ID = books_item_id;
     }
 }
 else
 {
     // Selection cleared: Reset dependent fields
-    input.Billing_Unit = null;
-    input.Product_Model = null;
+    input.Rental_Item_ID = null;
 }

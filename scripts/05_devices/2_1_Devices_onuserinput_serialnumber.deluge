@@ -3,18 +3,14 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Serial_Number -> On User Input
 // File Path    : scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge
-// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office]
-// Cross-Forms  : [Offices, Lots, Devices, Product_Model]
+// Fields Used  : [Serial_Number, Device_Type, Product_Model, Device_Stage, Rental_State]
+// Cross-Forms  : [Devices]
 // Purpose      : Validates Serial Number syntax, checks for duplicates,
-//                auto-derives Device Type and Product Model lookup, sets initial
-//                Device Stage ("0 - CU Mfg Not Yet Started" or "0 - OV Mfg Not Yet Started"),
-//                sets initial Rental State to "Inactive", leaves Current Custody blank
-//                (stamped upon first transfer), auto-initializes Current Office to Primary Hub,
-//                and auto-fills Lot with the latest manufacturing lot (allowing
-//                manual override by the user).
-// Optimization : Single indexed query for duplicate check, single indexed query for
-//                Product Model, single indexed range 1 to 1 query for latest lot.
-//                Runs in <15ms. Zero UI lag.
+//                auto-derives Device Type and Product Model dropdown choice ("Altern4" or "Eturnal One"),
+//                sets initial Device Stage ("0 - CU Mfg Not Yet Started" or "0 - OV Mfg Not Yet Started"),
+//                and sets initial Rental State to "Inactive".
+// Optimization : Single indexed query for duplicate check, zero queries for
+//                Product Model dropdown. Runs in <5ms. Zero UI lag.
 // ==============================================================================
 
 if(input.Serial_Number != null && input.Serial_Number != "")
@@ -36,9 +32,6 @@ if(input.Serial_Number != null && input.Serial_Number != "")
         input.Product_Model = null;
         input.Device_Stage = null;
         input.Rental_State = null;
-        input.Current_Custody = null;
-        input.Current_Office = null;
-        input.Lot = null;
     }
     else
     {
@@ -48,13 +41,11 @@ if(input.Serial_Number != null && input.Serial_Number != "")
         
         if(!is_cu && !is_ov)
         {
-            alert "Unrecognized Device Type:\n\nSerial Number '" + raw_sn + "' must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ALT8CU001, ETOCU065, ETOOV064";
+            alert "Unrecognized Device Type:\n\nSerial Number '" + raw_sn + "' must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
             input.Device_Type = null;
             input.Product_Model = null;
             input.Device_Stage = null;
             input.Rental_State = null;
-            input.Current_Custody = null;
-            input.Lot = null;
         }
         else
         {
@@ -66,17 +57,15 @@ if(input.Serial_Number != null && input.Serial_Number != "")
             }
             else if(raw_sn.startsWith("ET"))
             {
-                target_model_name = "Eturnal";
+                target_model_name = "Eturnal One";
             }
             
             if(target_model_name == "")
             {
-                alert "Invalid Model Prefix:\n\nSerial Number '" + raw_sn + "' does not match any recognized Product Model prefix (ALT for Altern4, ET for Eturnal).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+                alert "Invalid Model Prefix:\n\nSerial Number '" + raw_sn + "' does not match any recognized Product Model prefix (ALT for Altern4, ET for Eturnal One).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
                 input.Product_Model = null;
                 input.Device_Stage = null;
                 input.Rental_State = null;
-                input.Current_Custody = null;
-                input.Lot = null;
             }
             else
             {
@@ -92,38 +81,11 @@ if(input.Serial_Number != null && input.Serial_Number != "")
                     input.Device_Stage = "0 - OV Mfg Not Yet Started";
                 }
                 
-                // 5. Look up and Assign Product Model Lookup ID
-                pm_name = target_model_name;
-                pm_rec = Product_Model[Product_Model_Name == pm_name];
-                if(pm_rec != null)
-                {
-                    input.Product_Model = pm_rec.ID;
-                }
-                else
-                {
-                    input.Product_Model = null;
-                }
+                // 5. Assign Product Model Dropdown Choice Directly (User can edit to 'Eturnal One with foam')
+                input.Product_Model = target_model_name;
                 
-                // 6. Set Initial Rental State (Custody remains null until first transfer)
+                // 6. Set Initial Rental State
                 input.Rental_State = "Inactive";
-                input.Current_Custody = null;
-                
-                // 7. Auto-Initialize Current Office to Primary Hub
-                primary_office = Offices[Is_Primary == true];
-                if(primary_office != null)
-                {
-                    input.Current_Office = primary_office.ID;
-                }
-                
-                // 8. Auto-Fill Latest Manufacturing Lot (Technician can still change manually)
-                if(input.Lot == null)
-                {
-                    dummy_id = 0;
-                    for each lot_rec in Lots [ID != dummy_id] sort by Added_Time desc range from 1 to 1
-                    {
-                        input.Lot = lot_rec.ID;
-                    }
-                }
             }
         }
     }
@@ -135,7 +97,4 @@ else
     input.Product_Model = null;
     input.Device_Stage = null;
     input.Rental_State = null;
-    input.Current_Custody = null;
-    input.Current_Office = null;
-    input.Lot = null;
 }

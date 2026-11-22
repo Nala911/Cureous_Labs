@@ -11,16 +11,9 @@ Cureous_Labs/
 │   ├── DATA_DICTIONARY.md       # Master field, link name, and dependency matrix
 │   └── modules/                 # Module specifications
 ├── scripts/                     # Standardized Deluge scripts organized by module
-│   ├── 01_lots/
 │   ├── 02_customers/
-│   ├── 03_offices/
 │   ├── 04_rental_items/
 │   ├── 05_devices/
-│   ├── 06_rental_agreements/
-│   ├── 07_stock_transfers/
-│   ├── 08_bed_stations/
-│   ├── 10_rental_logs/
-│   ├── product_models/
 │   └── functions/
 ├── GEMINI.md                    # Core architectural protocol and development rules
 ├── .gitignore

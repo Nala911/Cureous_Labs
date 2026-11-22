@@ -32,7 +32,7 @@ This document defines the permanent collaboration protocol, design standards, De
 
 4. **Script Generation & Organization**:
    - All Deluge code is saved in standalone, modular files under `scripts/<module_or_area>/`.
-   - Clean, descriptive file names indicating the exact workflow hook (e.g. `on_user_input_lot_id.deluge`, `on_validate_dispatch_guard.deluge`).
+   - Clean, descriptive file names indicating the exact workflow hook (e.g. `2_1_Devices_onuserinput_serialnumber.deluge`).
 
 ---
 
@@ -41,16 +41,9 @@ This document defines the permanent collaboration protocol, design standards, De
 All scripts are categorized into dedicated folders:
 ```
 scripts/
-├── 01_lots/
 ├── 02_customers/
-├── 03_offices/
 ├── 04_rental_items/
 ├── 05_devices/
-├── 06_rental_agreements/
-├── 07_stock_transfers/
-├── 08_bed_stations/
-├── 10_rental_logs/
-├── product_models/
 └── functions/
 ```
 
@@ -136,8 +129,8 @@ These rules are permanent and mandatory across all scripts in this project to pr
   dev = Devices[Serial_Number == serial];
   if(dev != null)
   {
-      dev.Current_Custody = "Dispatched";
-      dev.Current_Office = null;
+      dev.Rental_State = "Active";
+      dev.Current_Customer = cust_id;
   }
   ```
 - **NEVER use SQL-style `update Form [Criteria] [...]`**: Deluge does not support SQL syntax.
@@ -190,7 +183,7 @@ To guarantee high performance and avoid quota/statement bottlenecks:
 
 Before writing or modifying any workflow code:
 1. **Mandatory Schema Verification**:
-   - Confirm exact internal **Form Link Name** (e.g., `Stock_Transfer_Items` vs `Stock_Transfer_Item`).
+   - Confirm exact internal **Form Link Name** (e.g., `Rental_Items` vs `Rental_Item`).
    - Confirm exact internal **Field Link Names** for all referenced fields.
    - Confirm exact **Field Data Types** (e.g., is the field storing a `TEXT` Serial Number or a `NUMBER` Record ID?).
 2. **Data Dictionary Synchronization**:

@@ -14,11 +14,11 @@ When an unexpected error occurs during testing:
 
 ```text
 =================== 🚨 ANTIGRAVITY ERROR REPORT ===================
-File    : scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge
-Step    : Step 3: Hardware Conflict Guard
+File    : scripts/05_devices/3_Devices_onvalidate.deluge
+Step    : Step 3: Duplicate Guard
 Record  : 389472900000481234
 Error   : Invalid argument type: NullPointerException
-Context : {"Control_Unit": 389472900000112233, "Overlay_Asset": null}
+Context : {"Serial_Number": "ALT4CU001", "Product_Model": null}
 ==================================================================
 ```
 
@@ -42,7 +42,7 @@ Context : {"Control_Unit": 389472900000112233, "Overlay_Asset": null}
 ## 3. What Antigravity Does Automatically
 
 When you paste an `🚨 ANTIGRAVITY ERROR REPORT`:
-1. **Finds File**: Reads `File` and opens the exact file in the workspace (e.g. `scripts/08_bed_stations/3_Bed_Stations_onvalidate.deluge`).
+1. **Finds File**: Reads `File` and opens the exact file in the workspace (e.g. `scripts/05_devices/3_Devices_onvalidate.deluge`).
 2. **Locates Line**: Jumps to `Step` in the code.
 3. **Diagnoses Bug**: Inspects `Context` against `Error` to identify why the variable was null, mismatched, or broken.
 4. **Applies Fix**: Directly edits the script file with the permanent fix.

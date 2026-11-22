@@ -3,12 +3,13 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/05_devices/1_Devices_onload.deluge
-// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Custody, Current_Office, Current_Customer]
+// Fields Used  : [Serial_Number, Device_Type, Product_Model, Lot, Device_Stage, Rental_State, Current_Customer, Current_Office]
 // Cross-Forms  : None
-// Purpose      : In Add mode: Enables Serial_Number and Lot; keeps Device_Type
-//                and Product_Model disabled for visual context; hides custody and
-//                lifecycle fields.
-//                In Edit mode: Locks identity fields; enables Device_Stage and
+// Purpose      : In Add mode: Enables Serial_Number, Product_Model, and Lot;
+//                auto-selects the latest Lot ("26FB03") by default; keeps Device_Type
+//                disabled for visual context; hides lifecycle fields.
+//                In Edit mode: Locks Serial_Number and Product_Model; leaves Lot
+//                editable for technician reassignment; enables Device_Stage and
 //                dynamically populates only the relevant stages for that hardware
 //                (Control Unit vs Overlay) to allow progressive stage updates.
 // Optimization : Zero database queries consumed. Runs in <5ms.
@@ -16,45 +17,51 @@
 
 if(input.ID == null)
 {
-    // 1. ADD Mode: Only Serial Number & Lot are user interactive
+    // 1. ADD Mode: Serial Number, Product Model & Lot are user interactive
     enable Serial_Number;
+    enable Product_Model;
     enable Lot;
     show Serial_Number;
+    show Product_Model;
     show Lot;
+    
+    // Auto-fill latest Lot on Add mode (user is allowed to edit/override)
+    if(input.Lot == null || input.Lot == "")
+    {
+        input.Lot = "26FB03";
+    }
     
     // 2. Context Fields: Disabled so user sees hardware classification without editing
     disable Device_Type;
-    disable Product_Model;
     show Device_Type;
-    show Product_Model;
     
-    // 3. Custody and Lifecycle Fields: Hidden during new device creation
+    // 3. Lifecycle Fields: Hidden during new device creation
     hide Current_Customer;
     hide Current_Office;
     hide Device_Stage;
     hide Rental_State;
-    hide Current_Custody;
 }
 else
 {
-    // 4. EDIT Mode: Serial Number and Lot are immutable
+    // 4. EDIT Mode: Serial Number and Product Model are immutable
     disable Serial_Number;
-    disable Lot;
-    
-    // Context and custody fields remain locked
-    disable Rental_State;
-    disable Current_Custody;
-    disable Device_Type;
     disable Product_Model;
-    disable Current_Office;
+    
+    // Lot remains editable in Edit mode so technicians can reassign if needed
+    enable Lot;
+    show Lot;
+    
+    // Context and lifecycle fields remain locked
+    disable Rental_State;
+    disable Device_Type;
     disable Current_Customer;
+    disable Current_Office;
     
     show Rental_State;
-    show Current_Custody;
     show Device_Type;
     show Product_Model;
-    show Current_Office;
     show Current_Customer;
+    show Current_Office;
     
     // 5. Dynamic Stage Progression: Populate stages based on Device Type
     dev_type = input.Device_Type;

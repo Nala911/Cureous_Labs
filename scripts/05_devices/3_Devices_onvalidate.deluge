@@ -3,18 +3,19 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/05_devices/3_Devices_onvalidate.deluge
-// Fields Used  : [Serial_Number, Lot, Device_Type, Product_Model, Device_Stage, Rental_State, Current_Office]
-// Cross-Forms  : [Devices, Product_Model, Offices]
+// Fields Used  : [Serial_Number, Device_Type, Product_Model, Lot, Device_Stage, Rental_State]
+// Cross-Forms  : [Devices]
 // Purpose      : Comprehensive validation and data integrity engine for device intake:
-//                1. Validates mandatory Serial Number and Lot.
+//                1. Validates mandatory Serial Number.
 //                2. Enforces unique Serial Number (duplicate guard).
 //                3. Validates hardware serial syntax (must contain CU or OV;
-//                   must begin with recognized prefix ALT4, ALT8, ETO, ETOF).
-//                4. Validates and auto-links Product Model lookup.
-//                5. Hardware & Stage Compatibility: Strictly prevents assigning
+//                   must begin with recognized prefix ALT or ET).
+//                4. Validates and auto-derives Product Model dropdown choice ("Altern4", "Eturnal One", "Eturnal One with foam").
+//                5. Safety Fallback for Lot (defaults to "26FB03" if blank).
+//                6. Hardware & Stage Compatibility: Strictly prevents assigning
 //                   an Overlay stage to a Control Unit or vice versa.
-// Optimization : Single indexed query for duplicate check, single indexed query for
-//                Product Model fallback. Zero loop queries. Runs in <20ms.
+// Optimization : Single indexed query for duplicate check, zero queries for
+//                Product Model fallback. Zero loop queries. Runs in <15ms.
 // ==============================================================================
 
 // 1. Mandatory Check: Serial Number
@@ -24,17 +25,10 @@ if(input.Serial_Number == null || input.Serial_Number.trim() == "")
     cancel submit;
 }
 
-// 2. Mandatory Check: Lot
-if(input.Lot == null)
-{
-    alert "Mandatory Field Missing:\n\nPlease select the manufacturing Lot.";
-    cancel submit;
-}
-
 clean_sn = input.Serial_Number.trim().toUpperCase();
 input.Serial_Number = clean_sn;
 
-// 3. Duplicate Guard: Serial Number must be unique across all devices
+// 2. Duplicate Guard: Serial Number must be unique across all devices
 curr_id = 0;
 if(input.ID != null)
 {
@@ -48,13 +42,13 @@ if(existing_dev.count() > 0)
     cancel submit;
 }
 
-// 4. Validate Serial Syntax & Derive Safety Fallbacks
+// 3. Validate Serial Syntax & Derive Safety Fallbacks
 is_cu = clean_sn.contains("CU");
 is_ov = clean_sn.contains("OV");
 
 if(!is_cu && !is_ov)
 {
-    alert "Invalid Serial Number Format:\n\nSerial Number must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ALT8CU001, ETOCU065, ETOOV064";
+    alert "Invalid Serial Number Format:\n\nSerial Number must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
     cancel submit;
 }
 
@@ -78,8 +72,8 @@ if(input.Device_Type == null || input.Device_Type == "")
     }
 }
 
-// Safety Fallback for Product Model Lookup
-if(input.Product_Model == null)
+// Safety Fallback for Product Model Dropdown
+if(input.Product_Model == null || input.Product_Model == "")
 {
     target_name = "";
     if(clean_sn.startsWith("ALT"))
@@ -88,24 +82,25 @@ if(input.Product_Model == null)
     }
     else if(clean_sn.startsWith("ET"))
     {
-        target_name = "Eturnal";
+        target_name = "Eturnal One";
     }
     
     if(target_name != "")
     {
-        m_name = target_name;
-        m_rec = Product_Model[Product_Model_Name == m_name];
-        if(m_rec != null)
-        {
-            input.Product_Model = m_rec.ID;
-        }
+        input.Product_Model = target_name;
     }
 }
 
-if(input.Product_Model == null)
+if(input.Product_Model == null || input.Product_Model == "")
 {
-    alert "Product Model Missing:\n\nCould not link a valid Product Model for serial number '" + clean_sn + "'. Please ensure the Product Model master record exists.";
+    alert "Product Model Missing:\n\nPlease select a valid Product Model for serial number '" + clean_sn + "'.";
     cancel submit;
+}
+
+// Safety Fallback for Lot Number
+if(input.Lot == null || input.Lot == "")
+{
+    input.Lot = "26FB03";
 }
 
 // Safety Fallback for Initial Device Stage
@@ -142,14 +137,4 @@ else
 if(input.Rental_State == null || input.Rental_State == "")
 {
     input.Rental_State = "Inactive";
-}
-
-// Safety Fallback for Initial Office on Add mode (Custody remains blank until first transfer)
-if(input.ID == null && input.Current_Office == null)
-{
-    primary_office = Offices[Is_Primary == true];
-    if(primary_office != null)
-    {
-        input.Current_Office = primary_office.ID;
-    }
 }

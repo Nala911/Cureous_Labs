@@ -3,19 +3,19 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/04_rental_items/1_Rental_Items_onload.deluge
-// Fields Used  : [Product_Model, Billing_Unit, Item_Name]
+// Fields Used  : [Item_Name, Rental_Item_ID]
 // Cross-Forms  : [Rental_Items]
-// Purpose      : Enables Billing_Unit and Product_Model for user editing. Populates
-//                Item_Name dropdown choices with active Zoho Books rental items
-//                and standard options.
+// Purpose      : Manages UI visibility and fetches active Zoho Books rental items:
+//                1. Keeps Rental_Item_ID disabled and hidden (system managed).
+//                2. In Edit mode: Locks Item_Name to protect existing records.
+//                3. In Add mode: Populates Item_Name dropdown choices with active
+//                   rental items from Zoho Books that are not yet onboarded.
 // Optimization : Native Zoho Books integration call with graceful fallback.
 // ==============================================================================
 
-// 1. Ensure Product_Model and Billing_Unit are visible and editable
-show Product_Model;
-enable Product_Model;
-show Billing_Unit;
-enable Billing_Unit;
+// 1. Rental_Item_ID is system managed: Always keep disabled & hidden
+disable Rental_Item_ID;
+hide Rental_Item_ID;
 
 // 2. Edit Mode Protection: Disallow altering existing item record
 if(input.ID != null)
@@ -63,7 +63,7 @@ else
         }
     }
     
-    // Fallback: If Books returned no items or integration is inactive, load standard options
+    // Fallback: If Books returned no items or integration is offline, load standard options
     if(item_names.size() == 0)
     {
         default_options = {"Rental - Altern4™ - Daily", "Rental - Altern4™ - Monthly", "Rental - ETURNAL HOME- Monthly", "Rental - ETURNAL Hospital™ - Daily", "Rental - Eturnal One™ - Daily", "Rental - Eturnal One™ - Monthly"};
