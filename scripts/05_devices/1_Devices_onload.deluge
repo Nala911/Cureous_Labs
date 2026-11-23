@@ -3,16 +3,16 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/05_devices/1_Devices_onload.deluge
-// Fields Used  : [Serial_Number, Device_Type, Product_Model, Lot, Device_Stage, Rental_State, Current_Customer, Current_Office]
-// Cross-Forms  : None
+// Fields Used  : [Serial_Number, Device_Type, Product_Model, Lot, Device_Stage, Device_State, Current_Customer, Current_Office]
+// Cross-Forms  : [Lots, Product_Models]
 // Purpose      : In Add mode: Enables Serial_Number, Product_Model, and Lot;
-//                auto-selects the latest Lot ("26FB03") by default; keeps Device_Type
-//                disabled for visual context; hides lifecycle fields.
+//                auto-selects the latest Lot record ID from Lots by default;
+//                keeps Device_Type disabled for visual context; hides lifecycle fields.
 //                In Edit mode: Locks Serial_Number and Product_Model; leaves Lot
 //                editable for technician reassignment; enables Device_Stage and
 //                dynamically populates only the relevant stages for that hardware
 //                (Control Unit vs Overlay) to allow progressive stage updates.
-// Optimization : Zero database queries consumed. Runs in <5ms.
+// Optimization : Single indexed query for latest lot on Add mode. Runs in <10ms.
 // ==============================================================================
 
 if(input.ID == null)
@@ -25,10 +25,13 @@ if(input.ID == null)
     show Product_Model;
     show Lot;
     
-    // Auto-fill latest Lot on Add mode (user is allowed to edit/override)
-    if(input.Lot == null || input.Lot == "")
+    // Auto-fill latest Lot record on Add mode (user is allowed to edit/override)
+    if(input.Lot == null)
     {
-        input.Lot = "26FB03";
+        for each single_lot in Lots[ID != null] sort by Added_Time desc range from 1 to 1
+        {
+            input.Lot = single_lot.ID;
+        }
     }
     
     // 2. Context Fields: Disabled so user sees hardware classification without editing
@@ -39,7 +42,7 @@ if(input.ID == null)
     hide Current_Customer;
     hide Current_Office;
     hide Device_Stage;
-    hide Rental_State;
+    hide Device_State;
 }
 else
 {
@@ -52,12 +55,12 @@ else
     show Lot;
     
     // Context and lifecycle fields remain locked
-    disable Rental_State;
+    disable Device_State;
     disable Device_Type;
     disable Current_Customer;
     disable Current_Office;
     
-    show Rental_State;
+    show Device_State;
     show Device_Type;
     show Product_Model;
     show Current_Customer;

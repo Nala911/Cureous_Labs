@@ -17,8 +17,8 @@ A clinically functioning system consists of **TWO independent physical component
 
 ### Manufacturing & Lifecycle Independence
 - **Independent Manufacturing**: Control Units and Overlays are manufactured, assembled, tested, and inventoried completely independently.
-- **Dynamic Bedside Pairing**: They are **never** manufactured in fixed pairs. They are paired dynamically at the patient bedside during field deployment.
-- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced; the mattress remains untouched under the patient.
+- **Dynamic Bedside Pairing**: They are **never** manufactured in fixed pairs. They are paired dynamically at the patient bedside during field deployment via Module 07 (`Deployment_Logs`).
+- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced; the mattress remains untouched under the patient. `Deployment_Logs` accommodates single-component swaps seamlessly.
 
 ---
 
@@ -28,18 +28,19 @@ A clinically functioning system consists of **TWO independent physical component
 - **Hospitals / Institutions**: Bulk fleet rentals (e.g., 5 to 20+ systems deployed across ICUs and wards).
 - **Homecare Patients**: Single system rental for home-bound individuals.
 
-*(Note: Commercial contract, patient deployment, and billing execution modules are queued for a comprehensive module redesign).*
+### Commercial Deployment & Lifecycle Tracking
+- **Deployment Logs (Module 07)**: Manages dynamic bedside pairing, customer allocation, rental/demo/idle states, and automatically synchronizes physical device state in `Devices` (`Device_State` and `Current_Customer`).
 
 ---
 
-## 3. Hardware Product Models & Families
+## 3. Hardware Product Models & Families (Module 08: Product Models)
 
-Managed directly as standardized choice classifications across physical devices (`Devices`) and commercial rental catalog items (`Rental_Items`):
+Managed centrally through the **`Product Models`** (`Product_Models`) master catalog, providing a normalized relational source of truth for physical devices (`Devices`) and commercial rental catalog items (`Rental_Items`):
 - **Altern4**: Standard alternating pressure 4-inch system (basic institutional tier).
 - **Altern8**: Advanced alternating pressure 8-inch system.
-- **EturnalOne**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
+- **Eturnal One**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
 - **Eturnal One with foam**: Premium tier featuring a safety foam underlay base to prevent patient bottoming-out during sudden power cuts.
-- Hardware models are auto-derived seamlessly from Serial Number prefixes during device intake while remaining accessible as native dropdown choices.
+- Hardware models are auto-derived dynamically from Serial Number prefixes during device intake by resolving against `Product_Models`, while remaining accessible as lookup choices for technicians.
 
 ---
 

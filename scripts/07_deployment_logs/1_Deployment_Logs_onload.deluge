@@ -1,0 +1,62 @@
+// ==============================================================================
+// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge
+// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay, State]
+// Cross-Forms  : []
+// Purpose      : Initializes default values in Add mode (Start_Date to today,
+//                State to "Rental") and locks closed records in Edit mode if
+//                already marked "Returned" to prevent audit drift.
+// Optimization : Zero database queries. Executes instantaneously in UI.
+// ==============================================================================
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: Enable interactive deployment fields
+    enable Customer;
+    enable Control_Unit;
+    enable Overlay;
+    enable Start_Date;
+    enable End_Date;
+    enable State;
+    
+    show Customer;
+    show Control_Unit;
+    show Overlay;
+    show Start_Date;
+    show End_Date;
+    show State;
+    
+    // Auto-populate Start Date with today's date if empty
+    if(input.Start_Date == null)
+    {
+        input.Start_Date = zoho.currentdate;
+    }
+    
+    // Default deployment state to Rental
+    if(input.State == null || input.State == "")
+    {
+        input.State = "Rental";
+    }
+}
+else
+{
+    // 2. EDIT Mode: Audit lock if deployment is already returned
+    if(input.State == "Returned")
+    {
+        disable Customer;
+        disable Control_Unit;
+        disable Overlay;
+        disable Start_Date;
+    }
+    else
+    {
+        enable Customer;
+        enable Control_Unit;
+        enable Overlay;
+        enable Start_Date;
+        enable End_Date;
+        enable State;
+    }
+}

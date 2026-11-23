@@ -1,0 +1,87 @@
+// ==============================================================================
+// Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
+// Script Type  : Stateless Form Action (On Click of Submit)
+// Trigger Hook : Form Actions -> Submit Button -> On Click
+// File Path    : scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge
+// Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
+// Cross-Forms  : [Devices]
+// Purpose      : Validates selected devices and destination details. Fetches records
+//                in a single batch query. For office transfers, sets Current_Office,
+//                unassigns Current_Customer, and marks Device_State as 'Available in Stock'.
+//                For customer deployments, sets Current_Customer, clears Current_Office,
+//                and marks Device_State as 'Rentally Active'. Redirects cleanly to report.
+// Optimization : Single batch fetch [ID in dev_ids] prevents statement exhaustion.
+//                Safe and efficient for 100+ units in a single operation.
+// ==============================================================================
+
+// 1. Mandatory Input Validation
+if(input.Select_Devices == null || input.Select_Devices.isEmpty())
+{
+    alert "Please select at least one device to transfer custody.";
+    cancel submit;
+}
+
+if(input.Destination_Type == null || input.Destination_Type == "")
+{
+    alert "Please select the Destination Type.";
+    cancel submit;
+}
+
+dest_type = input.Destination_Type;
+
+if(dest_type == "Internal Office Transfer")
+{
+    if(input.Target_Office == null)
+    {
+        alert "Please select the target branch office.";
+        cancel submit;
+    }
+}
+else if(dest_type == "Customer Deployment")
+{
+    if(input.Target_Customer == null)
+    {
+        alert "Please select the target customer.";
+        cancel submit;
+    }
+}
+
+// 2. Single Batch Query to retrieve all selected device records
+dev_ids = input.Select_Devices;
+selected_devs = Devices[ID in dev_ids];
+
+if(selected_devs.count() == 0)
+{
+    alert "No matching device records found for the selected IDs.";
+    cancel submit;
+}
+
+// 3. Batch Custody & State Synchronization
+updated_count = 0;
+
+if(dest_type == "Internal Office Transfer")
+{
+    office_id = input.Target_Office;
+    for each dev in selected_devs
+    {
+        dev.Current_Office = office_id;
+        dev.Current_Customer = null;
+        dev.Device_State = "Available in Stock";
+        updated_count = updated_count + 1;
+    }
+}
+else if(dest_type == "Customer Deployment")
+{
+    cust_id = input.Target_Customer;
+    for each dev in selected_devs
+    {
+        dev.Current_Customer = cust_id;
+        dev.Current_Office = null;
+        dev.Device_State = "Rentally Active";
+        updated_count = updated_count + 1;
+    }
+}
+
+// 4. User Feedback & View Refresh
+alert "Successfully updated custody for " + updated_count + " device(s).";
+openUrl("#Report:All_Devices", "same window");

@@ -1,0 +1,41 @@
+// ==============================================================================
+// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Control_Unit -> On User Input
+// File Path    : scripts/07_deployment_logs/2_1_Deployment_Logs_onuserinput_control_unit.deluge
+// Fields Used  : [Control_Unit]
+// Cross-Forms  : [Devices]
+// Purpose      : Validates selected hardware is a Control Unit pump. Alerts if
+//                mismatched and clears field. In Add mode, warns if the pump is
+//                currently recorded as active elsewhere.
+// Optimization : Single indexed PK lookup by ID. Executes in <10ms.
+// ==============================================================================
+
+if(input.Control_Unit != null)
+{
+    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
+    target_cu_id = input.Control_Unit;
+    cu_dev = Devices[ID == target_cu_id];
+    
+    if(cu_dev != null)
+    {
+        // 1. Verify hardware classification
+        if(cu_dev.Device_Type != "Control Unit")
+        {
+            alert "Invalid Selection: The selected asset (" + cu_dev.Serial_Number + ") is an Overlay, not a Control Unit. Please select a valid Control Unit.";
+            input.Control_Unit = null;
+        }
+        else
+        {
+            // 2. Alert technician if device is currently marked active elsewhere
+            if(input.ID == null)
+            {
+                current_state = cu_dev.Device_State;
+                if(current_state == "Rentally Active" || current_state == "Active in Demo" || current_state == "Idle with Customer")
+                {
+                    alert "Warning: Control Unit " + cu_dev.Serial_Number + " is currently marked as '" + current_state + "'. Please ensure the previous deployment was returned.";
+                }
+            }
+        }
+    }
+}

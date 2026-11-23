@@ -1,0 +1,28 @@
+// ==============================================================================
+// Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
+// Script Type  : Stateless Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/05_devices/1_Update_Device_Custody_onload.deluge
+// Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
+// Cross-Forms  : None
+// Purpose      : Initializes the stateless custody transfer form. Dynamically
+//                adjusts visibility of Target_Office and Target_Customer based
+//                on the initial state of Destination_Type.
+// Optimization : Pure UI rule. Zero database queries. Runs in <1ms.
+// ==============================================================================
+
+if(input.Destination_Type == "Internal Office Transfer")
+{
+    show Target_Office;
+    hide Target_Customer;
+}
+else if(input.Destination_Type == "Customer Deployment")
+{
+    hide Target_Office;
+    show Target_Customer;
+}
+else
+{
+    hide Target_Office;
+    hide Target_Customer;
+}

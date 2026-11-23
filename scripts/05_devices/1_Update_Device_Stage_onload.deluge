@@ -1,0 +1,18 @@
+// ==============================================================================
+// Module Name  : Update Device Stage (Form Link Name: Update_Device_Stage)
+// Script Type  : Stateless Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/05_devices/1_Update_Device_Stage_onload.deluge
+// Fields Used  : [Select_Devices, New_Device_Stage]
+// Cross-Forms  : None
+// Purpose      : Initializes the stateless stage update form. If opened as a
+//                pop-up modal from a Report Custom Action, retains prefilled devices.
+//                Ensures interactive fields are clean and ready for user selection.
+// Optimization : Pure UI initialization. Zero database queries.
+// ==============================================================================
+
+// 1. Maintain interactive state for device multi-select and target stage
+if(input.Select_Devices != null)
+{
+    // Records already prefilled via report action or URL parameter
+}

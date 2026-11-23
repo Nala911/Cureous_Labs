@@ -31,15 +31,14 @@
 3. **Device Type** `[Dropdown - Disabled Context]` (Auto-derived from serial: `"Control Unit"`, `"Overlay"`)
    - Field Link Name: `Device_Type`
    - Form Behavior: Visible & Disabled on Add and Edit.
-4. **Product Model** `[Dropdown]` (Auto-derived hardware model: `Altern4`, `Eturnal One`, `Eturnal One with foam`)
+4. **Product Model** `[Lookup -> Product_Models, displaying Product_Model_Name]` (Auto-derived hardware model lookup: `Altern4`, `Eturnal One`, etc.)
    - Field Link Name: `Product_Model`
-   - Options: `"Altern4"`, `"Eturnal One"`, `"Eturnal One with foam"`
-   - Form Behavior: Visible & Enabled on Add (auto-selected on serial input, user-editable); Visible & Locked in Edit mode.
-5. **Lot** `[Dropdown]` (Manufacturing Lot Number)
+   - Target Module: `Product_Models` (`Product_Model_Name`)
+   - Form Behavior: Visible & Enabled on Add (auto-selected from `Product_Models` via serial prefix, user-editable); Visible & Locked in Edit mode.
+5. **Lot** `[Lookup -> Lots, displaying Lot_ID]` (Manufacturing Lot Number)
    - Field Link Name: `Lot`
-   - Options: Current lot numbers (e.g. `26AB02`, `26FB03`, etc.).
-   - Decoding Format: `[YY][M][Seq]` (`26` = 2026, `A` = January, `B` = February, ..., `F` = June; remaining digits = batch order number in that year).
-   - Form Behavior: Visible & Enabled on Add (auto-fills latest lot `"26FB03"` on load, user-editable); Visible & Enabled in Edit mode (technicians can reassign if needed).
+   - Target Module: `Lots` (`Lot_ID`)
+   - Form Behavior: Visible & Enabled on Add (auto-populates with the latest lot record ID from `Lots`, user-editable); Visible & Enabled in Edit mode (technicians can reassign if needed).
 
 ### C. Metric & Lifecycle Fields (Hidden on Add):
 *Note: These are operational status, customer/office assignment, and lifecycle metric fields. They are not entered during initial device intake and are hidden on Add mode.*
@@ -74,10 +73,10 @@
      - `OV Retesting Needed`
      - `OV Repair Needed`
      - `OV Disinfection Needed`
-9. **Rental State** `[Dropdown - Hidden on Add]` (Commercial deployment state)
-   - Field Link Name: `Rental_State`
-   - Options: `"Active"`, `"Inactive"`
-   - Form Behavior: Hidden on Add (defaults to "Inactive" in background); Visible & Locked in Edit mode; updated during active customer deployment (`Active` on patient deployment, `Inactive` when in warehouse/buffer).
+9. **Device State** `[Dropdown - Hidden on Add]` (Commercial & deployment state)
+   - Field Link Name: `Device_State`
+   - Options: `"Rentally Active"`, `"Active in Demo"`, `"Idle with Customer"`, `"Available in Stock"`
+   - Form Behavior: Hidden on Add (defaults to "Available in Stock" in background); Visible & Locked in Edit mode; updated during active customer deployment, returns, or stock intake.
 
 ---
 
@@ -87,19 +86,19 @@
 - **File**: `scripts/05_devices/1_Devices_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable `Serial_Number`, `Product_Model`, and `Lot` as interactive fields. Auto-select the latest lot (`"26FB03"`) by default. Keep `Device_Type` disabled to provide clear context without user editing. Hide lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Rental_State`).
-  - In EDIT Mode: Lock `Serial_Number` and `Product_Model`. Keep `Lot` enabled so technicians can reassign lots if necessary. Display and lock context and lifecycle fields (`Rental_State`, `Device_Type`, `Current_Customer`, `Current_Office`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and populating only the relevant stages for that hardware (`Control Unit` vs `Overlay`), re-asserting the current saved stage, and enabling `Device_Stage` for progressive stage updates.
+  - In ADD Mode: Enable `Serial_Number`, `Product_Model`, and `Lot` as interactive fields. Dynamically query `Lots` to auto-select the latest lot created by default. Keep `Device_Type` disabled to provide clear context without user editing. Hide lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Device_State`).
+  - In EDIT Mode: Lock `Serial_Number` and `Product_Model`. Keep `Lot` enabled so technicians can reassign lots if necessary. Display and lock context and lifecycle fields (`Device_State`, `Device_Type`, `Current_Customer`, `Current_Office`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and populating only the relevant stages for that hardware (`Control Unit` vs `Overlay`), re-asserting the current saved stage, and enabling `Device_Stage` for progressive stage updates.
 
 ### Workflow 2: On User Input (Step 1: Serial Number)
 - **File**: `scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Serial_Number -> On User Input
 - **Plain English Logic**:
-  - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Rental_State`).
+  - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Device_State`).
   - Step 2: Duplicate check: Check if `Serial_Number` exists in `Devices`. If found, alert user and clear field.
   - Step 3: Detect `Device_Type`: If contains `"CU"` -> `"Control Unit"`; if `"OV"` -> `"Overlay"`; else alert and clear.
   - Step 4: Auto-initialize `Device_Stage`: If Control Unit -> `"0 - CU Mfg Not Yet Started"`; if Overlay -> `"0 - OV Mfg Not Yet Started"`.
-  - Step 5: Detect `Product_Model`: Matches serial prefix to determine target model (`ALT` -> `"Altern4"`, `ET` -> `"Eturnal One"`) and directly sets `Product_Model` dropdown choice, while allowing user to edit (e.g. choose `"Eturnal One with foam"`).
-  - Step 6: Initialize `Rental_State = "Inactive"`.
+  - Step 5: Detect `Product_Model`: Matches serial prefix to determine target model (`ALT` -> `"Altern4"`, `ET` -> `"Eturnal One"`), queries `Product_Models` to retrieve the matching record ID, and assigns `Product_Model` lookup, while allowing user to edit/reassign (e.g. choose `"Eturnal One with foam"`).
+  - Step 6: Initialize `Device_State = "Available in Stock"`.
 
 ### Workflow 2.2: On Update of Device Stage (Auto-Harmonization Guard)
 - **File**: `scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge`
@@ -118,7 +117,7 @@
   - Step 2: Sanitize `Serial_Number` (trim & uppercase).
   - Step 3: Duplicate check: Query `Devices` to prevent duplicate serial numbers.
   - Step 4: Verify syntax: Serial number must contain "CU" or "OV", and begin with valid prefix.
-  - Step 5: Safety fallback: Ensure `Device_Type`, `Product_Model` dropdown, initial `Device_Stage` (`"0 - CU Mfg Not Yet Started"` or `"0 - OV Mfg Not Yet Started"`), and `Rental_State` ("Inactive") are populated.
+  - Step 5: Safety fallback: Ensure `Device_Type`, `Product_Model` lookup (queries `Product_Models` for matching model ID if unassigned), `Lot` lookup (fallback to latest created lot from `Lots`), initial `Device_Stage` (`"0 - CU Mfg Not Yet Started"` or `"0 - OV Mfg Not Yet Started"`), and `Device_State` ("Available in Stock") are populated.
   - Step 6: Bulk Edit & Compatibility Guard: Prevents assigning Overlay stages to Control Units or Control Unit stages to Overlays, protecting against mismatched stage assignments during report bulk edits.
 
 ### Workflow 4: On Form Submission Success
@@ -126,3 +125,55 @@
 - **Trigger**: Created -> Form Actions -> On Success
 - **Plain English Logic**:
   - Step 1: Redirect cleanly to `All_Devices` report view (`openUrl("#Report:All_Devices", "same window");`), returning user to master asset register.
+
+---
+
+## 4. Stateless Bulk Action Utilities & Report Custom Actions
+
+To provide high-speed, user-friendly batch processing without relying on Creator's slow native report bulk edit, two dedicated stateless utility forms are implemented. They can be accessed directly from the navigation menu (for manual barcode scanning) or launched automatically as pre-filled pop-up modals from the `All_Devices` report via Custom Actions.
+
+### A. Utility 1: Update Device Stage (`Update_Device_Stage`)
+- **Form Type**: Stateless Form (No record storage; executes Deluge on submit)
+- **Form Link Name**: `Update_Device_Stage`
+- **Fields**:
+  1. **Select Devices** `[Lookup -> Devices, displaying Serial_Number - Multi-Select]`
+     - Field Link Name: `Select_Devices`
+     - Behavior: Interactive field populated by user or pre-filled from `All_Devices` report custom action.
+  2. **New Device Stage** `[Dropdown]`
+     - Field Link Name: `New_Device_Stage`
+     - Choices: All standard Control Unit and Overlay manufacturing and maintenance stages.
+- **Automated Harmonization Principle**:
+  - By default, if the batch contains mixed hardware types (Control Units and Overlays), the submit workflow automatically maps the selected stage to the counterpart stage for the respective hardware (e.g. selecting `5 - CU Assembly Completed & Not Tested` automatically applies `5 - OV Assembly Completed & Not Tested` to any Overlays in the batch).
+- **Workflows**:
+  - **On Load**: `scripts/05_devices/1_Update_Device_Stage_onload.deluge`
+    - Evaluates pre-filled selection if passed from report.
+  - **On Click of Submit**: `scripts/05_devices/5_1_Update_Device_Stage_onclick_submit.deluge`
+    - Validates selection and stage. Fetches target device records in a single batch query, iterates and updates `Device_Stage` with automatic hardware-stage mapping, alerts user of success count, and closes/refreshes view.
+
+### B. Utility 2: Update Device Custody (`Update_Device_Custody`)
+- **Form Type**: Stateless Form (No record storage; executes Deluge on submit)
+- **Form Link Name**: `Update_Device_Custody`
+- **Fields**:
+  1. **Select Devices** `[Lookup -> Devices, displaying Serial_Number - Multi-Select]`
+     - Field Link Name: `Select_Devices`
+     - Behavior: Interactive field populated by user or pre-filled from `All_Devices` report custom action.
+  2. **Destination Type** `[Radio / Dropdown]`
+     - Field Link Name: `Destination_Type`
+     - Choices: `"Internal Office Transfer"`, `"Customer Deployment"`
+  3. **Target Office** `[Lookup -> Offices, displaying Office_Name]`
+     - Field Link Name: `Target_Office`
+     - Behavior: Dynamically displayed when `Destination_Type == "Internal Office Transfer"`.
+  4. **Target Customer** `[Lookup -> Customers, displaying Customer_Name]`
+     - Field Link Name: `Target_Customer`
+     - Behavior: Dynamically displayed when `Destination_Type == "Customer Deployment"`.
+- **Workflows**:
+  - **On Load**: `scripts/05_devices/1_Update_Device_Custody_onload.deluge`
+    - Hides `Target_Office` and `Target_Customer` on initial load.
+  - **On User Input (Destination Type)**: `scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`
+    - Shows `Target_Office` and hides `Target_Customer` when `"Internal Office Transfer"` is chosen; shows `Target_Customer` and hides `Target_Office` when `"Customer Deployment"` is chosen.
+  - **On Click of Submit**: `scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge`
+    - Validates selections. Fetches target device records in a single batch query. For office transfer: updates `Current_Office`, clears `Current_Customer`, and sets `Device_State = "Available in Stock"`. For customer deployment: updates `Current_Customer`, clears `Current_Office`, and sets `Device_State = "Rentally Active"`. Alerts user of success count and closes/refreshes view.
+
+### C. Report Custom Action Integration on `All_Devices`
+- **Action 1**: `Update Stage` -> Opens `Update_Device_Stage` in a pop-up window, mapping selected record IDs into `Select_Devices`.
+- **Action 2**: `Update Custody` -> Opens `Update_Device_Custody` in a pop-up window, mapping selected record IDs into `Select_Devices`.

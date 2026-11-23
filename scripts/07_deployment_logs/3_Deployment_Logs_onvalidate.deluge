@@ -1,0 +1,108 @@
+// ==============================================================================
+// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Script Type  : Form Workflow (On Validate)
+// Trigger Hook : Created or Edited -> Form Actions -> On Validate
+// File Path    : scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge
+// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, State]
+// Cross-Forms  : [Deployment_Logs, Devices]
+// Purpose      : Enforces mandatory fields, validates dates, ensures at least
+//                one physical device is selected, checks hardware types, and
+//                prevents double-booking an active Control Unit or Overlay.
+// Optimization : Targeted indexed criteria queries evaluated only on submit.
+// ==============================================================================
+
+// 1. Mandatory Core Field Validations
+if(input.Customer == null)
+{
+    alert "Customer is mandatory. Please select a customer.";
+    cancel submit;
+}
+
+if(input.Start_Date == null)
+{
+    alert "Start Date is mandatory. Please enter the deployment start date.";
+    cancel submit;
+}
+
+if(input.State == null || input.State == "")
+{
+    alert "Deployment State is mandatory. Please select Rental, Demo, Idle, or Returned.";
+    cancel submit;
+}
+
+// 2. Hardware Pairing Guard: At least one component must be selected
+if(input.Control_Unit == null && input.Overlay == null)
+{
+    alert "Please select at least one device (Control Unit pump or Overlay mattress) to deploy.";
+    cancel submit;
+}
+
+// 3. Date Integrity Validations
+if(input.End_Date != null && input.End_Date < input.Start_Date)
+{
+    alert "Invalid Date Range: End Date cannot be earlier than Start Date.";
+    cancel submit;
+}
+
+if(input.State == "Returned" && input.End_Date == null)
+{
+    alert "End Date is mandatory when marking a deployment as Returned.";
+    cancel submit;
+}
+
+// 4. Hardware Type Verification & Cross-Module Parity
+if(input.Control_Unit != null)
+{
+    target_cu = input.Control_Unit;
+    cu_dev = Devices[ID == target_cu];
+    if(cu_dev != null && cu_dev.Device_Type != "Control Unit")
+    {
+        alert "Invalid Component: Selected Control Unit (" + cu_dev.Serial_Number + ") is an Overlay. Please select a valid Control Unit.";
+        cancel submit;
+    }
+}
+
+if(input.Overlay != null)
+{
+    target_ov = input.Overlay;
+    ov_dev = Devices[ID == target_ov];
+    if(ov_dev != null && ov_dev.Device_Type != "Overlay")
+    {
+        alert "Invalid Component: Selected Overlay (" + ov_dev.Serial_Number + ") is a Control Unit. Please select a valid Overlay mattress.";
+        cancel submit;
+    }
+}
+
+// 5. Double-Booking Prevention: Guard against overlapping active deployments
+if(input.State != "Returned")
+{
+    curr_id = 0;
+    if(input.ID != null)
+    {
+        curr_id = input.ID;
+    }
+    
+    // Check if Control Unit is already engaged in another open deployment
+    if(input.Control_Unit != null)
+    {
+        target_cu = input.Control_Unit;
+        open_cu_logs = Deployment_Logs[ID != curr_id && Control_Unit == target_cu && State != "Returned"];
+        if(open_cu_logs.count() > 0)
+        {
+            alert "Conflict Detected: The selected Control Unit is already deployed in an active deployment log. Please return the device from its previous deployment before creating a new one.";
+            cancel submit;
+        }
+    }
+    
+    // Check if Overlay is already engaged in another open deployment
+    if(input.Overlay != null)
+    {
+        target_ov = input.Overlay;
+        open_ov_logs = Deployment_Logs[ID != curr_id && Overlay == target_ov && State != "Returned"];
+        if(open_ov_logs.count() > 0)
+        {
+            alert "Conflict Detected: The selected Overlay mattress is already deployed in an active deployment log. Please return the mattress from its previous deployment before creating a new one.";
+            cancel submit;
+        }
+    }
+}

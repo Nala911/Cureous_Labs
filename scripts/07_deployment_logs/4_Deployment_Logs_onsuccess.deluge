@@ -1,0 +1,70 @@
+// ==============================================================================
+// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Script Type  : Form Workflow (On Success)
+// Trigger Hook : Created or Edited -> Form Actions -> On Success
+// File Path    : scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge
+// Fields Used  : [State, Customer, Control_Unit, Overlay]
+// Cross-Forms  : [Devices]
+// Purpose      : Synchronizes physical asset master records in Devices. Maps
+//                deployment State to Devices.Device_State and sets or clears
+//                Devices.Current_Customer for both Control Unit and Overlay.
+// Optimization : Targeted direct record updates by PK. Zero statement waste.
+// ==============================================================================
+
+// 1. Determine target device state and customer allocation
+target_state = "Available in Stock";
+target_cust = null;
+
+if(input.State == "Rental")
+{
+    target_state = "Rentally Active";
+    target_cust = input.Customer;
+}
+else if(input.State == "Demo")
+{
+    target_state = "Active in Demo";
+    target_cust = input.Customer;
+}
+else if(input.State == "Idle")
+{
+    target_state = "Idle with Customer";
+    target_cust = input.Customer;
+}
+else if(input.State == "Returned")
+{
+    target_state = "Available in Stock";
+    target_cust = null;
+}
+
+// 2. Synchronize Control Unit asset master record
+if(input.Control_Unit != null)
+{
+    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
+    target_cu = input.Control_Unit;
+    cu_dev = Devices[ID == target_cu];
+    
+    if(cu_dev != null)
+    {
+        // Direct record update (Law 3)
+        cu_dev.Device_State = target_state;
+        cu_dev.Current_Customer = target_cust;
+    }
+}
+
+// 3. Synchronize Overlay mattress asset master record
+if(input.Overlay != null)
+{
+    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
+    target_ov = input.Overlay;
+    ov_dev = Devices[ID == target_ov];
+    
+    if(ov_dev != null)
+    {
+        // Direct record update (Law 3)
+        ov_dev.Device_State = target_state;
+        ov_dev.Current_Customer = target_cust;
+    }
+}
+
+// 4. Return user cleanly to the Deployment Logs report view
+openUrl("#Report:All_Deployment_Logs", "same window");

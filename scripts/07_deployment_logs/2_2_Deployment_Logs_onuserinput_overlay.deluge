@@ -1,0 +1,41 @@
+// ==============================================================================
+// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Overlay -> On User Input
+// File Path    : scripts/07_deployment_logs/2_2_Deployment_Logs_onuserinput_overlay.deluge
+// Fields Used  : [Overlay]
+// Cross-Forms  : [Devices]
+// Purpose      : Validates selected hardware is an Overlay mattress. Alerts if
+//                mismatched and clears field. In Add mode, warns if the mattress
+//                is currently recorded as active elsewhere.
+// Optimization : Single indexed PK lookup by ID. Executes in <10ms.
+// ==============================================================================
+
+if(input.Overlay != null)
+{
+    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
+    target_ov_id = input.Overlay;
+    ov_dev = Devices[ID == target_ov_id];
+    
+    if(ov_dev != null)
+    {
+        // 1. Verify hardware classification
+        if(ov_dev.Device_Type != "Overlay")
+        {
+            alert "Invalid Selection: The selected asset (" + ov_dev.Serial_Number + ") is a Control Unit, not an Overlay. Please select a valid Overlay mattress.";
+            input.Overlay = null;
+        }
+        else
+        {
+            // 2. Alert technician if device is currently marked active elsewhere
+            if(input.ID == null)
+            {
+                current_state = ov_dev.Device_State;
+                if(current_state == "Rentally Active" || current_state == "Active in Demo" || current_state == "Idle with Customer")
+                {
+                    alert "Warning: Overlay " + ov_dev.Serial_Number + " is currently marked as '" + current_state + "'. Please ensure the previous deployment was returned.";
+                }
+            }
+        }
+    }
+}
