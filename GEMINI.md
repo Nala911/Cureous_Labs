@@ -38,14 +38,43 @@ This document defines the permanent collaboration protocol, design standards, De
 
 ## 2. Directory & Script Architecture
 
-All scripts are categorized into dedicated folders:
+All scripts are categorized into dedicated module folders:
 ```
 scripts/
 ├── 02_customers/
-├── 04_rental_items/
+├── 03_offices/
 ├── 05_devices/
+│   ├── form_devices/
+│   ├── stateless_update_stage/
+│   ├── stateless_update_custody/
+│   └── report_all_devices/
+├── 07_deployments/
 └── functions/
 ```
+
+### Form-Based Subfolder Standard for Multi-Form Modules
+- **Single-Form Modules**: If a module contains only one primary form (e.g. `02_customers/`, `03_offices/`), scripts remain flat directly inside `scripts/<module>/`.
+- **Multi-Form Modules**: Whenever a module contains more than one form (e.g. primary database form + stateless action forms or wizards), the module directory must be subdivided into form-specific subfolders:
+  - `form_<form_link_name_lowercase>/` for the primary database form (e.g. `form_devices/`).
+  - `stateless_<action_name_lowercase>/` for stateless utility forms or wizards (e.g. `stateless_update_stage/`, `stateless_update_custody/`).
+  - `report_<report_link_name_lowercase>/` for report custom actions, bulk launcher functions, and record action items (e.g. `report_all_devices/`).
+- **Sequential Integrity**: Inside each subfolder, scripts strictly follow the chronological trigger sequence (`1_`, `2_`, `3_`, `4_`, `5_`) without file collision across forms.
+
+### Zoho Creator Naming, Navigation & Action Button Standard
+- **Consistent Form Naming**:
+  - **Primary Database Forms**: Plural noun (e.g., `Devices`, `Deployments`, `Customers`, `Offices`).
+  - **Stateless Wizard Forms**: `<Verb>_<Noun>` (e.g., `Update_Device_Stage`, `Update_Device_Custody`, `Bulk_Deploy_Devices`, `Swap_Deployment_Device`, `Close_Deployment`).
+- **Sidebar Navigation**: Keep only primary database modules at the root of the sidebar. Hide stateless wizard forms from the main menu or group them under a collapsed `Wizards & Utilities` section, launching them via Report Action Buttons.
+- **Function Namespaces**: Group report custom action launcher functions into module-specific namespaces (e.g., `devices_actions`, `deployments_actions`) instead of leaving them in `Default`.
+- **3-Tier Action Button Placement**:
+  1. **Report Header / Top Bar** *(No record selection)*: Bulk creation wizards (e.g., `Bulk Deploy`).
+  2. **Single Record / Detail View** *(1 row)*: Record-specific actions with condition guards (e.g., `Swap Device`, `Close Deployment` when `State != "Returned"`).
+  3. **Multiple Records** *(Checkbox selection)*: Batch updates across selected rows (e.g., `Update Stage`, `Update Custody`).
+
+### Standardized Documentation Tracking for Stateless Forms
+- **Module Doc Action Map (`docs/modules/<xx_module>.md`)**: Every multi-form module doc must maintain a **Stateless Wizards & Action Buttons Table** at the top of its Stateless Utilities / Action Buttons section using these exact columns:
+  `| Action Button Label | Report & Placement | Condition | Launcher Function & Namespace | Target Stateless Form | Script Folder |`
+- **Master Data Dictionary (`docs/DATA_DICTIONARY.md`)**: Every stateless form must have its own subsection under its parent module documenting its UI fields, **Pre-fill URL Parameters** (e.g., `?Select_Devices=...`, `?Deployment_ID=...`), and cross-form updates.
 
 ### Script File Naming Standard
 Every `.deluge` file must strictly follow this standardized naming pattern:
@@ -56,7 +85,7 @@ Trigger Numbering Sequence:
 - `2_1`, `2_2`, `2_3`... = On User Input in chronological user-entry order (`2_<step>_<FormName>_onuserinput_<fieldname>.deluge`)
 - `3` = On Validate (`3_<FormName>_onvalidate.deluge`)
 - `4` = On Success (`4_<FormName>_onsuccess.deluge`)
-- `5+` = Custom Actions / Functions / Schedules
+- `5+` = Custom Actions / Functions / Schedules (`5_1_<FormName>_onclick_<action>.deluge`)
 
 ### Script File Header Standard
 Every `.deluge` file must begin with this standardized single-line comment header:
@@ -65,7 +94,7 @@ Every `.deluge` file must begin with this standardized single-line comment heade
 // Module Name  : <Module Name> (Form Link Name: <Form_Link_Name>)
 // Script Type  : Form Workflow / Function / Schedule / Blueprint Action
 // Trigger Hook : <e.g. On User Input of Field_X | On Validate | On Success>
-// File Path    : scripts/<folder>/<filename>.deluge
+// File Path    : scripts/<folder>[/<subfolder>]/<filename>.deluge
 // Fields Used  : [<Field_1>, <Field_2>, ...]
 // Cross-Forms  : [<Related_Form_1>, ...]
 // Purpose      : <Plain English summary of what this code executes>
@@ -183,7 +212,7 @@ To guarantee high performance and avoid quota/statement bottlenecks:
 
 Before writing or modifying any workflow code:
 1. **Mandatory Schema Verification**:
-   - Confirm exact internal **Form Link Name** (e.g., `Rental_Items` vs `Rental_Item`).
+   - Confirm exact internal **Form Link Name** (e.g., `Product_Models` vs `Product_Model`).
    - Confirm exact internal **Field Link Names** for all referenced fields.
    - Confirm exact **Field Data Types** (e.g., is the field storing a `TEXT` Serial Number or a `NUMBER` Record ID?).
 2. **Data Dictionary Synchronization**:

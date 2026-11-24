@@ -1,0 +1,96 @@
+// ==============================================================================
+// Module Name  : Deployments (Form Link Name: Deployments)
+// Script Type  : Form Workflow (On Load)
+// Trigger Hook : Created or Edited -> Form Actions -> On Load
+// File Path    : scripts/07_deployments/1_Deployments_onload.deluge
+// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay, Deployment_State]
+// Cross-Forms  : []
+// Purpose      : Initializes default values in Add mode (Start_Date to today,
+//                Deployment_State choices restricted to Rental/Demo with Rental
+//                as default, End_Date hidden). In Edit mode, exposes full
+//                lifecycle states or locks closed records to prevent audit drift.
+// Optimization : Zero database queries. Executes instantaneously in UI.
+// ==============================================================================
+
+if(input.ID == null)
+{
+    // 1. ADD Mode: Enable interactive deployment fields and hide End_Date
+    enable Customer;
+    enable Control_Unit;
+    enable Overlay;
+    enable Start_Date;
+    enable Deployment_State;
+    
+    show Customer;
+    show Control_Unit;
+    show Overlay;
+    show Start_Date;
+    show Deployment_State;
+    
+    hide End_Date;
+    
+    // Auto-populate Start Date with today's date if empty
+    if(input.Start_Date == null)
+    {
+        input.Start_Date = zoho.currentdate;
+    }
+    
+    // Restrict initial Deployment State choices to Rental and Demo, defaulting to Rental
+    clear Deployment_State;
+    add_choices = list();
+    add_choices.add("Rental");
+    add_choices.add("Demo");
+    Deployment_State:ui.add(add_choices);
+    
+    if(input.Deployment_State == null || input.Deployment_State == "")
+    {
+        input.Deployment_State = "Rental";
+    }
+}
+else
+{
+    // 2. EDIT Mode: Audit lock if deployment is already closed
+    if(input.Deployment_State == "Closed")
+    {
+        show End_Date;
+        disable Customer;
+        disable Control_Unit;
+        disable Overlay;
+        disable Start_Date;
+        disable End_Date;
+        disable Deployment_State;
+    }
+    else
+    {
+        enable Customer;
+        enable Control_Unit;
+        enable Overlay;
+        enable Start_Date;
+        enable Deployment_State;
+        
+        if(input.End_Date != null)
+        {
+            show End_Date;
+            enable End_Date;
+        }
+        else
+        {
+            hide End_Date;
+        }
+        
+        // Expose full lifecycle choices in Edit mode while preserving current selection
+        current_state = input.Deployment_State;
+        clear Deployment_State;
+        edit_choices = list();
+        edit_choices.add("Rental");
+        edit_choices.add("Demo");
+        edit_choices.add("Idle");
+        edit_choices.add("Closed");
+        Deployment_State:ui.add(edit_choices);
+        
+        if(current_state != null && current_state != "")
+        {
+            input.Deployment_State = current_state;
+        }
+    }
+}

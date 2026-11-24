@@ -83,14 +83,14 @@
 ## 3. Workflows & Deluge Scripts
 
 ### Workflow 1: On Form Load
-- **File**: `scripts/05_devices/1_Devices_onload.deluge`
+- **File**: `scripts/05_devices/form_devices/1_Devices_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
   - In ADD Mode: Enable `Serial_Number`, `Product_Model`, and `Lot` as interactive fields. Dynamically query `Lots` to auto-select the latest lot created by default. Keep `Device_Type` disabled to provide clear context without user editing. Hide lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Device_State`).
   - In EDIT Mode: Lock `Serial_Number` and `Product_Model`. Keep `Lot` enabled so technicians can reassign lots if necessary. Display and lock context and lifecycle fields (`Device_State`, `Device_Type`, `Current_Customer`, `Current_Office`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and populating only the relevant stages for that hardware (`Control Unit` vs `Overlay`), re-asserting the current saved stage, and enabling `Device_Stage` for progressive stage updates.
 
 ### Workflow 2: On User Input (Step 1: Serial Number)
-- **File**: `scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`
+- **File**: `scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`
 - **Trigger**: Created or Edited -> Field Actions -> Serial_Number -> On User Input
 - **Plain English Logic**:
   - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Device_State`).
@@ -101,7 +101,7 @@
   - Step 6: Initialize `Device_State = "Available in Stock"`.
 
 ### Workflow 2.2: On Update of Device Stage (Auto-Harmonization Guard)
-- **File**: `scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge`
+- **File**: `scripts/05_devices/form_devices/2_2_Devices_onupdate_devicestage.deluge`
 - **Trigger**: Edited -> Field Actions -> Device_Stage -> On Update
 - **Plain English Logic**:
   - Step 1: Detect hardware classification (`Control Unit` vs `Overlay`).
@@ -110,7 +110,7 @@
   - Step 4: If a Control Unit receives an Overlay stage, automatically convert it to the exact equivalent Control Unit stage.
 
 ### Workflow 3: On Form Validation & Safety Guard
-- **File**: `scripts/05_devices/3_Devices_onvalidate.deluge`
+- **File**: `scripts/05_devices/form_devices/3_Devices_onvalidate.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Validate
 - **Plain English Logic**:
   - Step 1: Mandatory check: Ensure `Serial_Number` is entered.
@@ -121,7 +121,7 @@
   - Step 6: Bulk Edit & Compatibility Guard: Prevents assigning Overlay stages to Control Units or Control Unit stages to Overlays, protecting against mismatched stage assignments during report bulk edits.
 
 ### Workflow 4: On Form Submission Success
-- **File**: `scripts/05_devices/4_Devices_onsuccess.deluge`
+- **File**: `scripts/05_devices/form_devices/4_Devices_onsuccess.deluge`
 - **Trigger**: Created -> Form Actions -> On Success
 - **Plain English Logic**:
   - Step 1: Redirect cleanly to `All_Devices` report view (`openUrl("#Report:All_Devices", "same window");`), returning user to master asset register.
@@ -130,7 +130,14 @@
 
 ## 4. Stateless Bulk Action Utilities & Report Custom Actions
 
-To provide high-speed, user-friendly batch processing without relying on Creator's slow native report bulk edit, two dedicated stateless utility forms are implemented. They can be accessed directly from the navigation menu (for manual barcode scanning) or launched automatically as pre-filled pop-up modals from the `All_Devices` report via Custom Actions.
+To provide high-speed, user-friendly batch processing without relying on Creator's slow native report bulk edit, two dedicated stateless utility forms are implemented and launched as pre-filled pop-up modals from `All_Devices`.
+
+### Stateless Wizards & Action Buttons Map
+
+| Action Button Label | Report & Placement | Condition | Launcher Function & Namespace | Target Stateless Form | Script Folder |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Update Stage** | `All_Devices` -> Multiple Records | Always | `open_update_stage(Devices selected_devices)` *(Namespace: `Default` / `devices_actions`)* | `Update_Device_Stage` | `scripts/05_devices/stateless_update_stage/` |
+| **Update Custody** | `All_Devices` -> Multiple Records | Always | `open_update_custody(Devices selected_devices)` *(Namespace: `Default` / `devices_actions`)* | `Update_Device_Custody` | `scripts/05_devices/stateless_update_custody/` |
 
 ### A. Utility 1: Update Device Stage (`Update_Device_Stage`)
 - **Form Type**: Stateless Form (No record storage; executes Deluge on submit)
@@ -145,9 +152,9 @@ To provide high-speed, user-friendly batch processing without relying on Creator
 - **Automated Harmonization Principle**:
   - By default, if the batch contains mixed hardware types (Control Units and Overlays), the submit workflow automatically maps the selected stage to the counterpart stage for the respective hardware (e.g. selecting `5 - CU Assembly Completed & Not Tested` automatically applies `5 - OV Assembly Completed & Not Tested` to any Overlays in the batch).
 - **Workflows**:
-  - **On Load**: `scripts/05_devices/1_Update_Device_Stage_onload.deluge`
+  - **On Load**: `scripts/05_devices/stateless_update_stage/1_Update_Device_Stage_onload.deluge`
     - Evaluates pre-filled selection if passed from report.
-  - **On Click of Submit**: `scripts/05_devices/5_1_Update_Device_Stage_onclick_submit.deluge`
+  - **On Click of Submit**: `scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge`
     - Validates selection and stage. Fetches target device records in a single batch query, iterates and updates `Device_Stage` with automatic hardware-stage mapping, alerts user of success count, and closes/refreshes view.
 
 ### B. Utility 2: Update Device Custody (`Update_Device_Custody`)
@@ -167,13 +174,17 @@ To provide high-speed, user-friendly batch processing without relying on Creator
      - Field Link Name: `Target_Customer`
      - Behavior: Dynamically displayed when `Destination_Type == "Customer Deployment"`.
 - **Workflows**:
-  - **On Load**: `scripts/05_devices/1_Update_Device_Custody_onload.deluge`
+  - **On Load**: `scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge`
     - Hides `Target_Office` and `Target_Customer` on initial load.
-  - **On User Input (Destination Type)**: `scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`
+  - **On User Input (Destination Type)**: `scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`
     - Shows `Target_Office` and hides `Target_Customer` when `"Internal Office Transfer"` is chosen; shows `Target_Customer` and hides `Target_Office` when `"Customer Deployment"` is chosen.
-  - **On Click of Submit**: `scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge`
+  - **On Click of Submit**: `scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge`
     - Validates selections. Fetches target device records in a single batch query. For office transfer: updates `Current_Office`, clears `Current_Customer`, and sets `Device_State = "Available in Stock"`. For customer deployment: updates `Current_Customer`, clears `Current_Office`, and sets `Device_State = "Rentally Active"`. Alerts user of success count and closes/refreshes view.
 
 ### C. Report Custom Action Integration on `All_Devices`
 - **Action 1**: `Update Stage` -> Opens `Update_Device_Stage` in a pop-up window, mapping selected record IDs into `Select_Devices`.
+  - **Function File**: `scripts/05_devices/report_all_devices/5_1_All_Devices_customaction_open_update_stage.deluge`
+  - **Function Signature**: `void open_update_stage(Devices selected_devices)`
 - **Action 2**: `Update Custody` -> Opens `Update_Device_Custody` in a pop-up window, mapping selected record IDs into `Select_Devices`.
+  - **Function File**: `scripts/05_devices/report_all_devices/5_2_All_Devices_customaction_open_update_custody.deluge`
+  - **Function Signature**: `void open_update_custody(Devices selected_devices)`

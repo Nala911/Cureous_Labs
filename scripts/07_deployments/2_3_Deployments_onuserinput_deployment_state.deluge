@@ -1,0 +1,33 @@
+// ==============================================================================
+// Module Name  : Deployments (Form Link Name: Deployments)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Deployment_State -> On User Input
+// File Path    : scripts/07_deployments/2_3_Deployments_onuserinput_deployment_state.deluge
+// Fields Used  : [Deployment_State, End_Date]
+// Cross-Forms  : []
+// Purpose      : Controls End_Date visibility and value when Deployment_State
+//                changes. If user selects "Closed", reveals End_Date and
+//                auto-populates it with today's date if empty. If switched back
+//                to an active state, hides End_Date and clears auto-set date.
+// Optimization : Pure UI event. Zero database queries.
+// ==============================================================================
+
+if(input.Deployment_State == "Closed")
+{
+    // Reveal and auto-populate End Date with today's date on close if empty
+    show End_Date;
+    enable End_Date;
+    if(input.End_Date == null)
+    {
+        input.End_Date = zoho.currentdate;
+    }
+}
+else
+{
+    // Hide End Date when active and clear auto-populated date if set to today
+    hide End_Date;
+    if(input.End_Date != null && input.End_Date == zoho.currentdate)
+    {
+        input.End_Date = null;
+    }
+}

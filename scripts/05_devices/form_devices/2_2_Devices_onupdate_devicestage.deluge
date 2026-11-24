@@ -2,7 +2,7 @@
 // Module Name  : Devices (Form Link Name: Devices)
 // Script Type  : Field Update Workflow (On Update)
 // Trigger Hook : Edited -> Field Actions -> Device_Stage -> On Update
-// File Path    : scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge
+// File Path    : scripts/05_devices/form_devices/2_2_Devices_onupdate_devicestage.deluge
 // Fields Used  : [Serial_Number, Device_Type, Device_Stage]
 // Cross-Forms  : None
 // Purpose      : Auto-harmonizes and enforces stage-hardware compatibility during

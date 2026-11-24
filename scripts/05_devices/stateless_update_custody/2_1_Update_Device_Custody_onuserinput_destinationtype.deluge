@@ -2,7 +2,7 @@
 // Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
 // Script Type  : Field Action Workflow (On User Input)
 // Trigger Hook : Field Actions -> Destination_Type -> On User Input
-// File Path    : scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge
+// File Path    : scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge
 // Fields Used  : [Destination_Type, Target_Office, Target_Customer]
 // Cross-Forms  : None
 // Purpose      : Dynamically toggles field visibility based on chosen destination.

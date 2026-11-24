@@ -1,12 +1,12 @@
 // ==============================================================================
-// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On Success)
 // Trigger Hook : Created or Edited -> Form Actions -> On Success
-// File Path    : scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge
-// Fields Used  : [State, Customer, Control_Unit, Overlay]
+// File Path    : scripts/07_deployments/4_Deployments_onsuccess.deluge
+// Fields Used  : [Deployment_State, Customer, Control_Unit, Overlay]
 // Cross-Forms  : [Devices]
 // Purpose      : Synchronizes physical asset master records in Devices. Maps
-//                deployment State to Devices.Device_State and sets or clears
+//                Deployment_State to Devices.Device_State and sets or clears
 //                Devices.Current_Customer for both Control Unit and Overlay.
 // Optimization : Targeted direct record updates by PK. Zero statement waste.
 // ==============================================================================
@@ -15,22 +15,22 @@
 target_state = "Available in Stock";
 target_cust = null;
 
-if(input.State == "Rental")
+if(input.Deployment_State == "Rental")
 {
     target_state = "Rentally Active";
     target_cust = input.Customer;
 }
-else if(input.State == "Demo")
+else if(input.Deployment_State == "Demo")
 {
     target_state = "Active in Demo";
     target_cust = input.Customer;
 }
-else if(input.State == "Idle")
+else if(input.Deployment_State == "Idle")
 {
     target_state = "Idle with Customer";
     target_cust = input.Customer;
 }
-else if(input.State == "Returned")
+else if(input.Deployment_State == "Closed")
 {
     target_state = "Available in Stock";
     target_cust = null;
@@ -66,5 +66,5 @@ if(input.Overlay != null)
     }
 }
 
-// 4. Return user cleanly to the Deployment Logs report view
-openUrl("#Report:All_Deployment_Logs", "same window");
+// 4. Return user cleanly to the Deployments report view
+openUrl("#Report:All_Deployments", "same window");

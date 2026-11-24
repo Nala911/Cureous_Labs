@@ -17,8 +17,8 @@ A clinically functioning system consists of **TWO independent physical component
 
 ### Manufacturing & Lifecycle Independence
 - **Independent Manufacturing**: Control Units and Overlays are manufactured, assembled, tested, and inventoried completely independently.
-- **Dynamic Bedside Pairing**: They are **never** manufactured in fixed pairs. They are paired dynamically at the patient bedside during field deployment via Module 07 (`Deployment_Logs`).
-- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced; the mattress remains untouched under the patient. `Deployment_Logs` accommodates single-component swaps seamlessly.
+- **Dynamic Bedside Pairing**: They are **never** manufactured in fixed pairs. They are paired dynamically at the patient bedside during field deployment via Module 07 (`Deployments`).
+- **Independent Maintenance & Swaps**: If a CU pump develops a valve failure on site, only the CU is replaced; the mattress remains untouched under the patient. `Deployments` accommodates single-component swaps seamlessly.
 
 ---
 
@@ -29,13 +29,13 @@ A clinically functioning system consists of **TWO independent physical component
 - **Homecare Patients**: Single system rental for home-bound individuals.
 
 ### Commercial Deployment & Lifecycle Tracking
-- **Deployment Logs (Module 07)**: Manages dynamic bedside pairing, customer allocation, rental/demo/idle states, and automatically synchronizes physical device state in `Devices` (`Device_State` and `Current_Customer`).
+- **Deployments (Module 07)**: Manages dynamic bedside pairing, customer allocation, rental/demo/idle states, and automatically synchronizes physical device state in `Devices` (`Device_State` and `Current_Customer`).
 
 ---
 
 ## 3. Hardware Product Models & Families (Module 08: Product Models)
 
-Managed centrally through the **`Product Models`** (`Product_Models`) master catalog, providing a normalized relational source of truth for physical devices (`Devices`) and commercial rental catalog items (`Rental_Items`):
+Managed centrally through the **`Product Models`** (`Product_Models`) master catalog, providing a normalized relational source of truth for physical devices (`Devices`):
 - **Altern4**: Standard alternating pressure 4-inch system (basic institutional tier).
 - **Altern8**: Advanced alternating pressure 8-inch system.
 - **Eturnal One**: Advanced micro-climate alternating pressure system with dynamic cycle timing.
@@ -51,8 +51,6 @@ The architecture maintains clean boundaries between Zoho Creator (operational ha
 1. **Customers Onboarding**:
    - Creator pulls active customer contacts from Zoho Books via native API.
    - Creator stores `Customer_ID` (Books Contact ID), locks financial details, and prevents manual data entry errors.
-2. **Rental Items Sync**:
-   - Creator rental items map 1:1 with Zoho Books rental service items, using `Books_Item_ID` as the billing line-item identifier.
 
 ---
 

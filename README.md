@@ -12,8 +12,9 @@ Cureous_Labs/
 │   └── modules/                 # Module specifications
 ├── scripts/                     # Standardized Deluge scripts organized by module
 │   ├── 02_customers/
-│   ├── 04_rental_items/
+│   ├── 03_offices/
 │   ├── 05_devices/
+│   ├── 07_deployments/
 │   └── functions/
 ├── GEMINI.md                    # Core architectural protocol and development rules
 ├── .gitignore

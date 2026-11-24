@@ -2,7 +2,7 @@
 // Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
 // Script Type  : Stateless Form Workflow (On Load)
 // Trigger Hook : Form Actions -> On Load
-// File Path    : scripts/05_devices/1_Update_Device_Custody_onload.deluge
+// File Path    : scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge
 // Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
 // Cross-Forms  : None
 // Purpose      : Initializes the stateless custody transfer form. Dynamically

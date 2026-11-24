@@ -2,7 +2,7 @@
 // Module Name  : Devices (Form Link Name: Devices)
 // Script Type  : Form Workflow (On Success)
 // Trigger Hook : Created -> Form Actions -> On Success
-// File Path    : scripts/05_devices/4_Devices_onsuccess.deluge
+// File Path    : scripts/05_devices/form_devices/4_Devices_onsuccess.deluge
 // Fields Used  : None
 // Cross-Forms  : None
 // Purpose      : Navigates cleanly to the 'All_Devices' report upon successful

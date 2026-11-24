@@ -14,13 +14,10 @@ Whenever any field, status, or logic is created, modified, or removed:
 ```
 [Lots] (Module 6) ──────────┐
                             ▼
-[Offices] (Module 3) ──> [Devices] (Module 5) <──── [Deployment_Logs] (Module 7)
+[Offices] (Module 3) ──> [Devices] (Module 5) <──── [Deployments] (Module 7)
                             ▲        ▲                   │
                             │        │                   ▼
 [Product_Models] (Mod 8) ───┘        └────── [Customers] (Module 2) <┘
-                                         ▲
-                                         │
-                             [Rental_Items] (Module 4)
 ```
 
 ---
@@ -44,27 +41,18 @@ Whenever any field, status, or logic is created, modified, or removed:
 
 ---
 
-## Module 4: Rental Items (`Rental_Items`)
-
-| Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Item Name** | `Item_Name` | Dropdown | **User Entry** (Mandatory, Synced Books / Standard Choices; Locked in Edit) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Display label for catalog items |
-| **Rental item id** | `Rental_Item_ID` | Single Line | **System Managed / Disabled Context** (Hidden, Auto-populated from Zoho Books) | — | `scripts/04_rental_items/1_Rental_Items_onload.deluge`<br>`scripts/04_rental_items/2_1_Rental_Items_onuserinput_itemname.deluge`<br>`scripts/04_rental_items/3_Rental_Items_onvalidate.deluge` | Direct Books Item ID passed to line items when generating invoices in deployment logs |
-
----
-
 ## Module 5: Devices (`Devices`)
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Serial Number** | `Serial_Number` | Single Line | **User Entry** (Mandatory, Unique, PK; Locked in Edit) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Module 11 (`Quality_Control`) |
-| **Device Type** | `Device_Type` | Dropdown | **Disabled Context** (Read-Only: "Control Unit", "Overlay") | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Auto-derived from serial string; hardware classification |
-| **Product Model** | `Product_Model` | Lookup | **Auto-Derived & User Editable on Add; Locked in Edit** | `Product_Models` (`Product_Model_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Module 08 (`Product_Models`) hardware model classification |
-| **Lot** | `Lot` | Lookup | **Auto-Default Latest & User Editable on Add and Edit** | `Lots` (`Lot_ID`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Module 06 (`Lots`) batch traceability & recall management |
-| **Current Customer** | `Current_Customer` | Lookup | **Hidden on Add** (Report / Allocation Only, Read-Only) | `Customers` (`Customer_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Direct customer allocation; dynamically assigned and unassigned by Module 07 (`Deployment_Logs`) and `Update_Device_Custody` |
-| **Current Office** | `Current_Office` | Lookup | **Hidden on Add** (Report / Location Only, Read-Only) | `Offices` (`Office_Name`) | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge` | Direct branch / warehouse custody tracking; updated by `Update_Device_Custody` |
-| **Device Stage** | `Device_Stage` | Dropdown | **Hidden on Add** (Auto-init Stage 0: "0 - CU Mfg Not Yet Started" / "0 - OV Mfg Not Yet Started"; Enabled in Edit mode with dynamic choices) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/2_2_Devices_onupdate_devicestage.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge`<br>`scripts/05_devices/5_1_Update_Device_Stage_onclick_submit.deluge` | Auto-harmonized on bulk edit; Stage gating for manufacturing and Module 11 QC; updated via `Update_Device_Stage` |
-| **Device State** | `Device_State` | Dropdown | **Hidden on Add** (Report / Status Only, Read-Only, Options: "Rentally Active", "Active in Demo", "Idle with Customer", "Available in Stock") | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge`<br>`scripts/07_deployment_logs/2_1_Deployment_Logs_onuserinput_control_unit.deluge`<br>`scripts/07_deployment_logs/2_2_Deployment_Logs_onuserinput_overlay.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Real-time commercial and operational status tracking; updated automatically by Module 07 (`Deployment_Logs`) and `Update_Device_Custody` |
+| **Serial Number** | `Serial_Number` | Single Line | **User Entry** (Mandatory, Unique, PK; Locked in Edit) | — | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Module 11 (`Quality_Control`) |
+| **Device Type** | `Device_Type` | Dropdown | **Disabled Context** (Read-Only: "Control Unit", "Overlay") | — | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge` | Auto-derived from serial string; hardware classification |
+| **Product Model** | `Product_Model` | Lookup | **Auto-Derived & User Editable on Add; Locked in Edit** | `Product_Models` (`Product_Model_Name`) | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Module 08 (`Product_Models`) hardware model classification |
+| **Lot** | `Lot` | Lookup | **Auto-Default Latest & User Editable on Add and Edit** | `Lots` (`Lot_ID`) | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Module 06 (`Lots`) batch traceability & recall management |
+| **Current Customer** | `Current_Customer` | Lookup | **Hidden on Add** (Report / Allocation Only, Read-Only) | `Customers` (`Customer_Name`) | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge`<br>`scripts/07_deployments/4_Deployments_onsuccess.deluge` | Direct customer allocation; dynamically assigned and unassigned by Module 07 (`Deployments`) and `Update_Device_Custody` |
+| **Current Office** | `Current_Office` | Lookup | **Hidden on Add** (Report / Location Only, Read-Only) | `Offices` (`Office_Name`) | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge` | Direct branch / warehouse custody tracking; updated by `Update_Device_Custody` |
+| **Device Stage** | `Device_Stage` | Dropdown | **Hidden on Add** (Auto-init Stage 0: "0 - CU Mfg Not Yet Started" / "0 - OV Mfg Not Yet Started"; Enabled in Edit mode with dynamic choices) | — | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/2_2_Devices_onupdate_devicestage.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge`<br>`scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge` | Auto-harmonized on bulk edit; Stage gating for manufacturing and Module 11 QC; updated via `Update_Device_Stage` |
+| **Device State** | `Device_State` | Dropdown | **Hidden on Add** (Report / Status Only, Read-Only, Options: "Rentally Active", "Active in Demo", "Idle with Customer", "Available in Stock") | — | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge`<br>`scripts/07_deployments/2_1_Deployments_onuserinput_control_unit.deluge`<br>`scripts/07_deployments/2_2_Deployments_onuserinput_overlay.deluge`<br>`scripts/07_deployments/4_Deployments_onsuccess.deluge` | Real-time commercial and operational status tracking; updated automatically by Module 07 (`Deployments`) and `Update_Device_Custody` |
 
 ---
 
@@ -72,20 +60,20 @@ Whenever any field, status, or logic is created, modified, or removed:
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Lot ID** | `Lot_ID` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Source of truth for `Devices.Lot` manufacturing batch tracking |
+| **Lot ID** | `Lot_ID` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/form_devices/1_Devices_onload.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Source of truth for `Devices.Lot` manufacturing batch tracking |
 
 ---
 
-## Module 7: Deployment Logs (`Deployment_Logs`)
+## Module 7: Deployments (`Deployments`)
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Customer** | `Customer` | Lookup | **User Entry** (Mandatory, Relational Link to Customer Master) | `Customers` (`Customer_Name`) | `scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Sets `Devices.Current_Customer` on paired assets |
-| **Control Unit** | `Control_Unit` | Lookup | **User Entry** (Optional if Overlay provided; Filtered to `Device_Type == "Control Unit"`) | `Devices` (`Serial_Number`) | `scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge`<br>`scripts/07_deployment_logs/2_1_Deployment_Logs_onuserinput_control_unit.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Direct asset allocation and state tracking |
-| **Overlay** | `Overlay` | Lookup | **User Entry** (Optional if Control Unit provided; Filtered to `Device_Type == "Overlay"`) | `Devices` (`Serial_Number`) | `scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge`<br>`scripts/07_deployment_logs/2_2_Deployment_Logs_onuserinput_overlay.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Direct asset allocation and state tracking |
-| **Start Date** | `Start_Date` | Date | **User Entry** (Mandatory, Defaults to current date) | — | `scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge` | Commercial billing start anchor |
-| **End Date** | `End_Date` | Date | **User Entry** (Optional on Add, Mandatory when State is Returned; must be `>= Start_Date`) | — | `scripts/07_deployment_logs/2_3_Deployment_Logs_onuserinput_state.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Commercial billing conclusion anchor |
-| **State** | `State` | Dropdown | **User Entry** (Mandatory; Choices: `"Rental"`, `"Demo"`, `"Idle"`, `"Returned"`; Defaults to `"Rental"`) | — | `scripts/07_deployment_logs/1_Deployment_Logs_onload.deluge`<br>`scripts/07_deployment_logs/2_3_Deployment_Logs_onuserinput_state.deluge`<br>`scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge`<br>`scripts/07_deployment_logs/4_Deployment_Logs_onsuccess.deluge` | Triggers automated updates to `Devices.Device_State` |
+| **Customer** | `Customer` | Lookup | **User Entry** (Mandatory, Relational Link to Customer Master) | `Customers` (`Customer_Name`) | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge`<br>`scripts/07_deployments/4_Deployments_onsuccess.deluge` | Sets `Devices.Current_Customer` on paired assets |
+| **Control Unit** | `Control_Unit` | Lookup | **User Entry** (Optional if Overlay provided; Form Builder Lookup Filter: `Device_Type == "Control Unit"`) | `Devices` (`Serial_Number`) | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/2_1_Deployments_onuserinput_control_unit.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge` | Direct asset allocation and state tracking |
+| **Overlay** | `Overlay` | Lookup | **User Entry** (Optional if Control Unit provided; Form Builder Lookup Filter: `Device_Type == "Overlay"`) | `Devices` (`Serial_Number`) | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/2_2_Deployments_onuserinput_overlay.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge` | Direct asset allocation and state tracking |
+| **Start Date** | `Start_Date` | Date | **User Entry** (Mandatory, Defaults to `zoho.currentdate`) | — | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge` | Commercial billing start anchor |
+| **End Date** | `End_Date` | Date | **Hidden on Add** (Revealed, enabled, and mandatory when `Deployment_State == "Closed"`; must be `>= Start_Date`) | — | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/2_3_Deployments_onuserinput_deployment_state.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge`<br>`scripts/07_deployments/4_Deployments_onsuccess.deluge` | Commercial billing conclusion anchor |
+| **Deployment State** | `Deployment_State` | Dropdown | **User Entry** (Mandatory; Add Mode choices: `"Rental"`, `"Demo"` defaulting to `"Rental"`; Edit Mode choices: `"Rental"`, `"Demo"`, `"Idle"`, `"Closed"`) | — | `scripts/07_deployments/1_Deployments_onload.deluge`<br>`scripts/07_deployments/2_3_Deployments_onuserinput_deployment_state.deluge`<br>`scripts/07_deployments/3_Deployments_onvalidate.deluge`<br>`scripts/07_deployments/4_Deployments_onsuccess.deluge` | Triggers automated updates to `Devices.Device_State` |
 
 ---
 
@@ -93,24 +81,30 @@ Whenever any field, status, or logic is created, modified, or removed:
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Product Model Name** | `Product_Model_Name` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Source of truth for `Devices.Product_Model` hardware model lookup |
+| **Product Model Name** | `Product_Model_Name` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Source of truth for `Devices.Product_Model` hardware model lookup |
 
 ---
 
-## Stateless Utility: Update Device Stage (`Update_Device_Stage`)
+### Module 5 Stateless Utility: Update Device Stage (`Update_Device_Stage`)
+- **Parent Module**: Module 5 (`Devices`)
+- **Pre-fill URL Parameters**: `?Select_Devices=<comma-separated Device IDs>` (passed from `All_Devices` via `open_update_stage`)
+- **Cross-Form Updates**: Updates `Devices.Device_Stage` (with CU/OV auto-harmonization)
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Select Devices** | `Select_Devices` | Lookup (Multi-Select) | **User Entry / Report Action Pre-fill** (Mandatory) | `Devices` (`Serial_Number`) | `scripts/05_devices/1_Update_Device_Stage_onload.deluge`<br>`scripts/05_devices/5_1_Update_Device_Stage_onclick_submit.deluge` | References target devices in `Devices` to bulk update stage |
-| **New Device Stage** | `New_Device_Stage` | Dropdown | **User Entry** (Mandatory; CU & OV manufacturing stages) | — | `scripts/05_devices/5_1_Update_Device_Stage_onclick_submit.deluge` | Target stage applied across selected devices with auto-harmonization |
+| **Select Devices** | `Select_Devices` | Lookup (Multi-Select) | **User Entry / Report Action Pre-fill** (Mandatory) | `Devices` (`Serial_Number`) | `scripts/05_devices/stateless_update_stage/1_Update_Device_Stage_onload.deluge`<br>`scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge`<br>`scripts/05_devices/report_all_devices/5_1_All_Devices_customaction_open_update_stage.deluge` | References target devices in `Devices` to bulk update stage |
+| **New Device Stage** | `New_Device_Stage` | Dropdown | **User Entry** (Mandatory; CU & OV manufacturing stages) | — | `scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge` | Target stage applied across selected devices with auto-harmonization |
 
 ---
 
-## Stateless Utility: Update Device Custody (`Update_Device_Custody`)
+### Module 5 Stateless Utility: Update Device Custody (`Update_Device_Custody`)
+- **Parent Module**: Module 5 (`Devices`)
+- **Pre-fill URL Parameters**: `?Select_Devices=<comma-separated Device IDs>` (passed from `All_Devices` via `open_update_custody`)
+- **Cross-Form Updates**: Updates `Devices.Current_Office`, `Devices.Current_Customer`, and `Devices.Device_State`
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Select Devices** | `Select_Devices` | Lookup (Multi-Select) | **User Entry / Report Action Pre-fill** (Mandatory) | `Devices` (`Serial_Number`) | `scripts/05_devices/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge` | References target devices in `Devices` to bulk update location/custody |
-| **Destination Type** | `Destination_Type` | Dropdown / Radio | **User Entry** (Mandatory; Choices: "Internal Office Transfer", "Customer Deployment") | — | `scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge` | Toggles dynamic display of Office vs Customer lookup |
-| **Target Office** | `Target_Office` | Lookup | **Dynamic User Entry** (Mandatory when Transfer is Office; hidden otherwise) | `Offices` (`Office_Name`) | `scripts/05_devices/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge` | Sets `Devices.Current_Office` |
-| **Target Customer** | `Target_Customer` | Lookup | **Dynamic User Entry** (Mandatory when Transfer is Customer; hidden otherwise) | `Customers` (`Customer_Name`) | `scripts/05_devices/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/5_1_Update_Device_Custody_onclick_submit.deluge` | Sets `Devices.Current_Customer` |
+| **Select Devices** | `Select_Devices` | Lookup (Multi-Select) | **User Entry / Report Action Pre-fill** (Mandatory) | `Devices` (`Serial_Number`) | `scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge`<br>`scripts/05_devices/report_all_devices/5_2_All_Devices_customaction_open_update_custody.deluge` | References target devices in `Devices` to bulk update location/custody |
+| **Destination Type** | `Destination_Type` | Dropdown / Radio | **User Entry** (Mandatory; Choices: "Internal Office Transfer", "Customer Deployment") | — | `scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge` | Toggles dynamic display of Office vs Customer lookup |
+| **Target Office** | `Target_Office` | Lookup | **Dynamic User Entry** (Mandatory when Transfer is Office; hidden otherwise) | `Offices` (`Office_Name`) | `scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge` | Sets `Devices.Current_Office` |
+| **Target Customer** | `Target_Customer` | Lookup | **Dynamic User Entry** (Mandatory when Transfer is Customer; hidden otherwise) | `Customers` (`Customer_Name`) | `scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge`<br>`scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`<br>`scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge` | Sets `Devices.Current_Customer` |

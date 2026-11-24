@@ -2,7 +2,7 @@
 // Module Name  : Devices (Form Link Name: Devices)
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Serial_Number -> On User Input
-// File Path    : scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge
+// File Path    : scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge
 // Fields Used  : [Serial_Number, Device_Type, Product_Model, Device_Stage, Device_State]
 // Cross-Forms  : [Devices, Product_Models]
 // Purpose      : Validates Serial Number syntax, checks for duplicates,

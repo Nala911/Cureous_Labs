@@ -3,7 +3,7 @@
 **Form Name**: `Product Models`  
 **Form Link Name**: `Product_Models`  
 **Default Report**: `All_Product_Models`  
-**Purpose**: Central master catalog for medical device hardware product lines and models. Provides the relational source of truth for categorizing physical inventory in `Devices` and associating equipment with commercial rental item tiers.
+**Purpose**: Central master catalog for medical device hardware product lines and models. Provides the relational source of truth for categorizing physical inventory in `Devices` and associating equipment with commercial rental service tiers.
 
 ---
 
@@ -18,7 +18,7 @@
 
 | Field Label | Field Link Name | Type | Form UI Behavior / Constraints | Target Lookup | Referenced in Scripts | Cross-Module Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Product Model Name** | `Product_Model_Name` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/3_Devices_onvalidate.deluge` | Target display field for `Devices.Product_Model` lookup |
+| **Product Model Name** | `Product_Model_Name` | Single Line | **User Entry** (Mandatory, Unique, Primary Identifier) | — | `scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge`<br>`scripts/05_devices/form_devices/3_Devices_onvalidate.deluge` | Target display field for `Devices.Product_Model` lookup |
 
 ---
 

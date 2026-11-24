@@ -2,7 +2,7 @@
 // Module Name  : Devices (Form Link Name: Devices)
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
-// File Path    : scripts/05_devices/3_Devices_onvalidate.deluge
+// File Path    : scripts/05_devices/form_devices/3_Devices_onvalidate.deluge
 // Fields Used  : [Serial_Number, Device_Type, Product_Model, Lot, Device_Stage, Device_State]
 // Cross-Forms  : [Devices, Lots, Product_Models]
 // Purpose      : Comprehensive validation and data integrity engine for device intake:

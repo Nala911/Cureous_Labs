@@ -1,8 +1,8 @@
 // ==============================================================================
-// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Control_Unit -> On User Input
-// File Path    : scripts/07_deployment_logs/2_1_Deployment_Logs_onuserinput_control_unit.deluge
+// File Path    : scripts/07_deployments/2_1_Deployments_onuserinput_control_unit.deluge
 // Fields Used  : [Control_Unit]
 // Cross-Forms  : [Devices]
 // Purpose      : Validates selected hardware is a Control Unit pump. Alerts if
@@ -33,7 +33,7 @@ if(input.Control_Unit != null)
                 current_state = cu_dev.Device_State;
                 if(current_state == "Rentally Active" || current_state == "Active in Demo" || current_state == "Idle with Customer")
                 {
-                    alert "Warning: Control Unit " + cu_dev.Serial_Number + " is currently marked as '" + current_state + "'. Please ensure the previous deployment was returned.";
+                    alert "Warning: Control Unit " + cu_dev.Serial_Number + " is currently marked as '" + current_state + "'. Please ensure the previous deployment was closed.";
                 }
             }
         }

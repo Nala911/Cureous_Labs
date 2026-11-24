@@ -1,10 +1,10 @@
 // ==============================================================================
-// Module Name  : Deployment Logs (Form Link Name: Deployment_Logs)
+// Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
-// File Path    : scripts/07_deployment_logs/3_Deployment_Logs_onvalidate.deluge
-// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, State]
-// Cross-Forms  : [Deployment_Logs, Devices]
+// File Path    : scripts/07_deployments/3_Deployments_onvalidate.deluge
+// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, Deployment_State]
+// Cross-Forms  : [Deployments, Devices]
 // Purpose      : Enforces mandatory fields, validates dates, ensures at least
 //                one physical device is selected, checks hardware types, and
 //                prevents double-booking an active Control Unit or Overlay.
@@ -24,9 +24,9 @@ if(input.Start_Date == null)
     cancel submit;
 }
 
-if(input.State == null || input.State == "")
+if(input.Deployment_State == null || input.Deployment_State == "")
 {
-    alert "Deployment State is mandatory. Please select Rental, Demo, Idle, or Returned.";
+    alert "Deployment State is mandatory. Please select Rental, Demo, Idle, or Closed.";
     cancel submit;
 }
 
@@ -44,9 +44,9 @@ if(input.End_Date != null && input.End_Date < input.Start_Date)
     cancel submit;
 }
 
-if(input.State == "Returned" && input.End_Date == null)
+if(input.Deployment_State == "Closed" && input.End_Date == null)
 {
-    alert "End Date is mandatory when marking a deployment as Returned.";
+    alert "End Date is mandatory when marking a deployment as Closed.";
     cancel submit;
 }
 
@@ -74,7 +74,7 @@ if(input.Overlay != null)
 }
 
 // 5. Double-Booking Prevention: Guard against overlapping active deployments
-if(input.State != "Returned")
+if(input.Deployment_State != "Closed")
 {
     curr_id = 0;
     if(input.ID != null)
@@ -86,10 +86,10 @@ if(input.State != "Returned")
     if(input.Control_Unit != null)
     {
         target_cu = input.Control_Unit;
-        open_cu_logs = Deployment_Logs[ID != curr_id && Control_Unit == target_cu && State != "Returned"];
+        open_cu_logs = Deployments[ID != curr_id && Control_Unit == target_cu && Deployment_State != "Closed"];
         if(open_cu_logs.count() > 0)
         {
-            alert "Conflict Detected: The selected Control Unit is already deployed in an active deployment log. Please return the device from its previous deployment before creating a new one.";
+            alert "Conflict Detected: The selected Control Unit is already deployed in an active deployment. Please close the previous deployment before creating a new one.";
             cancel submit;
         }
     }
@@ -98,10 +98,10 @@ if(input.State != "Returned")
     if(input.Overlay != null)
     {
         target_ov = input.Overlay;
-        open_ov_logs = Deployment_Logs[ID != curr_id && Overlay == target_ov && State != "Returned"];
+        open_ov_logs = Deployments[ID != curr_id && Overlay == target_ov && Deployment_State != "Closed"];
         if(open_ov_logs.count() > 0)
         {
-            alert "Conflict Detected: The selected Overlay mattress is already deployed in an active deployment log. Please return the mattress from its previous deployment before creating a new one.";
+            alert "Conflict Detected: The selected Overlay mattress is already deployed in an active deployment. Please close the previous deployment before creating a new one.";
             cancel submit;
         }
     }
