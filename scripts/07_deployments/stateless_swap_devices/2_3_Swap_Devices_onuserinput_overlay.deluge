@@ -1,0 +1,67 @@
+// ==============================================================================
+// Module Name  : Swap Devices (Form Link Name: Swap_Devices)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Overlay -> On User Input
+// File Path    : scripts/07_deployments/stateless_swap_devices/2_3_Swap_Devices_onuserinput_overlay.deluge
+// Fields Used  : [Deployment, Overlay]
+// Cross-Forms  : [Deployments, Devices]
+// Purpose      : Validates that the selected asset is an Overlay. If it is a
+//                new replacement unit (different from the source deployment),
+//                enforces "6 - Ready Condition", "Available in Stock", and no
+//                active deployment conflict.
+// Optimization : Targeted PK lookups only. Runs in <15ms.
+// ==============================================================================
+
+if(input.Overlay != null)
+{
+    target_ov_id = input.Overlay;
+    ov_dev = Devices[ID == target_ov_id];
+    
+    if(ov_dev != null)
+    {
+        if(ov_dev.Device_Type != "Overlay")
+        {
+            alert "Invalid Selection: The selected asset (" + ov_dev.Serial_Number + ") is a Control Unit, not an Overlay.";
+            input.Overlay = null;
+        }
+        else
+        {
+            // Determine whether this is the unit already assigned to the selected deployment
+            is_retained = false;
+            curr_dep_id = 0;
+            if(input.Deployment != null)
+            {
+                curr_dep_id = input.Deployment;
+                src_dep = Deployments[ID == curr_dep_id];
+                if(src_dep != null && src_dep.Overlay == target_ov_id)
+                {
+                    is_retained = true;
+                }
+            }
+            
+            // Enforce readiness and double-booking checks on new replacement units
+            if(!is_retained)
+            {
+                if(ov_dev.Device_Stage != "6 - Ready Condition")
+                {
+                    alert "Not Ready for Swap: Overlay " + ov_dev.Serial_Number + " is at stage '" + ov_dev.Device_Stage + "' (requires '6 - Ready Condition').";
+                    input.Overlay = null;
+                }
+                else if(ov_dev.Device_State != "Available in Stock")
+                {
+                    alert "Device Unavailable: Overlay " + ov_dev.Serial_Number + " is currently '" + ov_dev.Device_State + "' (requires 'Available in Stock').";
+                    input.Overlay = null;
+                }
+                else
+                {
+                    open_ov_logs = Deployments[ID != curr_dep_id && Overlay == target_ov_id && Deployment_State != "Closed"];
+                    if(open_ov_logs.count() > 0)
+                    {
+                        alert "Conflict Detected: Overlay " + ov_dev.Serial_Number + " is already deployed in another active deployment.";
+                        input.Overlay = null;
+                    }
+                }
+            }
+        }
+    }
+}

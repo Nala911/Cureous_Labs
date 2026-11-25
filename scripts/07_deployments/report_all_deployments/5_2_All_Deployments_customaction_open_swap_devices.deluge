@@ -1,0 +1,37 @@
+// ==============================================================================
+// Module Name  : Deployments (Report Link Name: All_Deployments)
+// Script Type  : Report Custom Action Function (Namespace: deployments_actions)
+// Trigger Hook : Report Actions -> For Multiple Records -> Swap Devices
+// File Path    : scripts/07_deployments/report_all_deployments/5_2_All_Deployments_customaction_open_swap_devices.deluge
+// Fields Used  : [ID, Deployment_State]
+// Cross-Forms  : [Deployments, Swap_Devices]
+// Purpose      : Validates that exactly one active deployment is selected from
+//                All_Deployments and launches the Swap_Devices stateless modal
+//                with the Deployment lookup pre-filled.
+// Optimization : Single indexed PK lookup only when count == 1.
+// ==============================================================================
+
+void open_swap_devices(Deployments selected_deployments)
+{
+    // 1. Extract selected Deployment IDs
+    id_list = selected_deployments.ID.getAll();
+    
+    // 2. Ensure exactly one record is selected
+    if(id_list.size() != 1)
+    {
+        alert "Please select exactly one active deployment to swap devices.";
+    }
+    else
+    {
+        target_id = id_list.get(0);
+        dep = Deployments[ID == target_id];
+        if(dep == null || dep.Deployment_State == "Closed")
+        {
+            alert "Swap Blocked: Closed deployments cannot be swapped. Please select an active deployment.";
+        }
+        else
+        {
+            openUrl("#Form:Swap_Devices?Deployment=" + target_id, "popup window", "height=650px,width=700px");
+        }
+    }
+}

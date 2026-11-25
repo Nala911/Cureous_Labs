@@ -5,11 +5,11 @@
 // File Path    : scripts/05_devices/form_devices/2_2_Devices_onupdate_devicestage.deluge
 // Fields Used  : [Serial_Number, Device_Type, Device_Stage]
 // Cross-Forms  : None
-// Purpose      : Auto-harmonizes and enforces stage-hardware compatibility during
-//                individual and bulk edits. If an Overlay receives a Control Unit
-//                stage (or vice-versa), automatically converts it to the exact
-//                counterpart stage, guaranteeing zero data corruption.
-// Optimization : Pure in-memory string evaluation. Zero database queries. Runs in <2ms.
+// Purpose      : Auto-harmonizes hardware-specific Stages 1 and 2 during
+//                individual and bulk edits. Shared stages (0, 3, 4, 5, 6, and
+//                maintenance stages) apply identically to both Control Units and
+//                Overlays without conversion.
+// Optimization : Pure in-memory string evaluation. Zero database queries. Runs in <1ms.
 // ==============================================================================
 
 if(input.Device_Stage != null && input.Device_Stage != "")
@@ -30,92 +30,27 @@ if(input.Device_Stage != null && input.Device_Stage != "")
     
     stg = input.Device_Stage;
     
-    // 2. CASE 1: Device is an OVERLAY, but received a CONTROL UNIT stage
-    if(d_type == "Overlay" && stg.contains("CU"))
+    // 2. Auto-harmonize hardware-specific Stages 1 and 2 only
+    if(d_type == "Overlay")
     {
-        if(stg == "0 - CU Mfg Not Yet Started")
+        if(stg == "1 - CU Enclosure Mfg in Progress")
         {
-            input.Device_Stage = "0 - OV Mfg Not Yet Started";
-        }
-        else if(stg == "1 - CU Enclosure Mfg in Progress")
-        {
-            input.Device_Stage = "1 - OV in Screen printing/Welding";
+            input.Device_Stage = "1 - OV in Screen Printing / Welding";
         }
         else if(stg == "2 - CU Subsystems Assembled")
         {
             input.Device_Stage = "2 - OV in Stitching";
         }
-        else if(stg == "3 - CU Yet to Assemble")
-        {
-            input.Device_Stage = "3 - OV Yet to Assemble";
-        }
-        else if(stg == "4 - CU Assembly in Progress")
-        {
-            input.Device_Stage = "4 - OV Assembly In Progress";
-        }
-        else if(stg == "5 - CU Assembly Completed & Not Tested")
-        {
-            input.Device_Stage = "5 - OV Assembly Completed & Not Tested";
-        }
-        else if(stg == "6 - CU Ready Condition")
-        {
-            input.Device_Stage = "6 - OV Ready Condition";
-        }
-        else if(stg == "CU Retesting Needed")
-        {
-            input.Device_Stage = "OV Retesting Needed";
-        }
-        else if(stg == "CU Repair Needed")
-        {
-            input.Device_Stage = "OV Repair Needed";
-        }
-        else if(stg == "CU Disinfection Needed")
-        {
-            input.Device_Stage = "OV Disinfection Needed";
-        }
     }
-    // 3. CASE 2: Device is a CONTROL UNIT, but received an OVERLAY stage
-    else if(d_type == "Control Unit" && stg.contains("OV"))
+    else if(d_type == "Control Unit")
     {
-        if(stg == "0 - OV Mfg Not Yet Started")
-        {
-            input.Device_Stage = "0 - CU Mfg Not Yet Started";
-        }
-        else if(stg == "1 - OV in Screen printing/Welding")
+        if(stg == "1 - OV in Screen Printing / Welding")
         {
             input.Device_Stage = "1 - CU Enclosure Mfg in Progress";
         }
         else if(stg == "2 - OV in Stitching")
         {
             input.Device_Stage = "2 - CU Subsystems Assembled";
-        }
-        else if(stg == "3 - OV Yet to Assemble")
-        {
-            input.Device_Stage = "3 - CU Yet to Assemble";
-        }
-        else if(stg == "4 - OV Assembly In Progress")
-        {
-            input.Device_Stage = "4 - CU Assembly in Progress";
-        }
-        else if(stg == "5 - OV Assembly Completed & Not Tested")
-        {
-            input.Device_Stage = "5 - CU Assembly Completed & Not Tested";
-        }
-        else if(stg == "6 - OV Ready Condition")
-        {
-            input.Device_Stage = "6 - CU Ready Condition";
-        }
-        else if(stg == "OV Retesting Needed")
-        {
-            input.Device_Stage = "CU Retesting Needed";
-        }
-        else if(stg == "OV Repair Needed")
-        {
-            input.Device_Stage = "CU Repair Needed";
-        }
-        else if(stg == "OV Disinfection Needed")
-        {
-            input.Device_Stage = "CU Disinfection Needed";
         }
     }
 }

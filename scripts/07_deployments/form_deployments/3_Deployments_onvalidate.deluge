@@ -2,7 +2,7 @@
 // Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
-// File Path    : scripts/07_deployments/3_Deployments_onvalidate.deluge
+// File Path    : scripts/07_deployments/form_deployments/3_Deployments_onvalidate.deluge
 // Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, Deployment_State]
 // Cross-Forms  : [Deployments, Devices]
 // Purpose      : Enforces mandatory fields, validates dates, ensures at least
@@ -50,15 +50,31 @@ if(input.Deployment_State == "Closed" && input.End_Date == null)
     cancel submit;
 }
 
-// 4. Hardware Type Verification & Cross-Module Parity
+// 4. Hardware Type Verification & Add-Mode Readiness Parity
 if(input.Control_Unit != null)
 {
     target_cu = input.Control_Unit;
     cu_dev = Devices[ID == target_cu];
-    if(cu_dev != null && cu_dev.Device_Type != "Control Unit")
+    if(cu_dev != null)
     {
-        alert "Invalid Component: Selected Control Unit (" + cu_dev.Serial_Number + ") is an Overlay. Please select a valid Control Unit.";
-        cancel submit;
+        if(cu_dev.Device_Type != "Control Unit")
+        {
+            alert "Invalid Component: Selected Control Unit (" + cu_dev.Serial_Number + ") is an Overlay. Please select a valid Control Unit.";
+            cancel submit;
+        }
+        if(input.ID == null)
+        {
+            if(cu_dev.Device_Stage != "6 - Ready Condition")
+            {
+                alert "Deployment Blocked: Control Unit " + cu_dev.Serial_Number + " is at stage '" + cu_dev.Device_Stage + "'. Only '6 - Ready Condition' devices can be deployed.";
+                cancel submit;
+            }
+            if(cu_dev.Device_State != "Available in Stock")
+            {
+                alert "Deployment Blocked: Control Unit " + cu_dev.Serial_Number + " has state '" + cu_dev.Device_State + "'. Only 'Available in Stock' devices can be deployed.";
+                cancel submit;
+            }
+        }
     }
 }
 
@@ -66,10 +82,26 @@ if(input.Overlay != null)
 {
     target_ov = input.Overlay;
     ov_dev = Devices[ID == target_ov];
-    if(ov_dev != null && ov_dev.Device_Type != "Overlay")
+    if(ov_dev != null)
     {
-        alert "Invalid Component: Selected Overlay (" + ov_dev.Serial_Number + ") is a Control Unit. Please select a valid Overlay mattress.";
-        cancel submit;
+        if(ov_dev.Device_Type != "Overlay")
+        {
+            alert "Invalid Component: Selected Overlay (" + ov_dev.Serial_Number + ") is a Control Unit. Please select a valid Overlay mattress.";
+            cancel submit;
+        }
+        if(input.ID == null)
+        {
+            if(ov_dev.Device_Stage != "6 - Ready Condition")
+            {
+                alert "Deployment Blocked: Overlay " + ov_dev.Serial_Number + " is at stage '" + ov_dev.Device_Stage + "'. Only '6 - Ready Condition' devices can be deployed.";
+                cancel submit;
+            }
+            if(ov_dev.Device_State != "Available in Stock")
+            {
+                alert "Deployment Blocked: Overlay " + ov_dev.Serial_Number + " has state '" + ov_dev.Device_State + "'. Only 'Available in Stock' devices can be deployed.";
+                cancel submit;
+            }
+        }
     }
 }
 

@@ -50,29 +50,22 @@
    - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports. Updated via stock transfers / intake.
 8. **Device Stage** `[Dropdown - Hidden on Add]` (Manufacturing, Logistics & Maintenance stage; editable in Edit mode)
    - Field Link Name: `Device_Stage`
-   - Form Behavior: Hidden on Add (auto-initialized to Stage 0 based on serial number); Visible & Enabled in Edit mode with options dynamically filtered by `Device_Type`.
-   - **Control Unit Options**:
-     - `0 - CU Mfg Not Yet Started`
+   - Form Behavior: Hidden on Add (auto-initialized to `"0 - Mfg Not Yet Started"`); Visible & Enabled in Edit mode with shared lifecycle options plus hardware-specific Stages 1–2 dynamically filtered by `Device_Type`.
+   - **Shared Lifecycle Options (Both Control Units & Overlays)**:
+     - `0 - Mfg Not Yet Started`
+     - `3 - Yet to Assemble`
+     - `4 - Assembly in Progress`
+     - `5 - Assembly Completed & Not Tested`
+     - `6 - Ready Condition`
+     - `Retesting Needed`
+     - `Repair Needed`
+     - `Disinfection Needed`
+   - **Control Unit-Specific Options (Stages 1–2)**:
      - `1 - CU Enclosure Mfg in Progress`
      - `2 - CU Subsystems Assembled`
-     - `3 - CU Yet to Assemble`
-     - `4 - CU Assembly in Progress`
-     - `5 - CU Assembly Completed & Not Tested`
-     - `6 - CU Ready Condition`
-     - `CU Retesting Needed`
-     - `CU Repair Needed`
-     - `CU Disinfection Needed`
-   - **Overlay Options**:
-     - `0 - OV Mfg Not Yet Started`
-     - `1 - OV in Screen printing/Welding`
+   - **Overlay-Specific Options (Stages 1–2)**:
+     - `1 - OV in Screen Printing / Welding`
      - `2 - OV in Stitching`
-     - `3 - OV Yet to Assemble`
-     - `4 - OV Assembly In Progress`
-     - `5 - OV Assembly Completed & Not Tested`
-     - `6 - OV Ready Condition`
-     - `OV Retesting Needed`
-     - `OV Repair Needed`
-     - `OV Disinfection Needed`
 9. **Device State** `[Dropdown - Hidden on Add]` (Commercial & deployment state)
    - Field Link Name: `Device_State`
    - Options: `"Rentally Active"`, `"Active in Demo"`, `"Idle with Customer"`, `"Available in Stock"`
@@ -96,7 +89,7 @@
   - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Device_State`).
   - Step 2: Duplicate check: Check if `Serial_Number` exists in `Devices`. If found, alert user and clear field.
   - Step 3: Detect `Device_Type`: If contains `"CU"` -> `"Control Unit"`; if `"OV"` -> `"Overlay"`; else alert and clear.
-  - Step 4: Auto-initialize `Device_Stage`: If Control Unit -> `"0 - CU Mfg Not Yet Started"`; if Overlay -> `"0 - OV Mfg Not Yet Started"`.
+  - Step 4: Auto-initialize `Device_Stage` to `"0 - Mfg Not Yet Started"` for both Control Units and Overlays.
   - Step 5: Detect `Product_Model`: Matches serial prefix to determine target model (`ALT` -> `"Altern4"`, `ET` -> `"Eturnal One"`), queries `Product_Models` to retrieve the matching record ID, and assigns `Product_Model` lookup, while allowing user to edit/reassign (e.g. choose `"Eturnal One with foam"`).
   - Step 6: Initialize `Device_State = "Available in Stock"`.
 
@@ -105,9 +98,9 @@
 - **Trigger**: Edited -> Field Actions -> Device_Stage -> On Update
 - **Plain English Logic**:
   - Step 1: Detect hardware classification (`Control Unit` vs `Overlay`).
-  - Step 2: Compare updated `Device_Stage` against hardware type.
-  - Step 3: If an Overlay receives a Control Unit stage (e.g. during report Bulk Edit), automatically harmonize and convert it to the exact equivalent Overlay stage (e.g., `5 - CU Assembly Completed & Not Tested` -> `5 - OV Assembly Completed & Not Tested`).
-  - Step 4: If a Control Unit receives an Overlay stage, automatically convert it to the exact equivalent Control Unit stage.
+  - Step 2: Check whether updated `Device_Stage` is a hardware-specific Stage 1 or Stage 2 option (`1 - CU...` / `2 - CU...` vs `1 - OV...` / `2 - OV...`). Shared stages (`0`, `3`, `4`, `5`, `6 - Ready Condition`, `Retesting Needed`, `Repair Needed`, `Disinfection Needed`) pass through without conversion.
+  - Step 3: If an Overlay receives a Control Unit Stage 1 or 2 (e.g. during report Bulk Edit), automatically convert it to the counterpart Overlay Stage 1 or 2 (`1 - OV in Screen Printing / Welding`, `2 - OV in Stitching`).
+  - Step 4: If a Control Unit receives an Overlay Stage 1 or 2, automatically convert it to the counterpart Control Unit Stage 1 or 2 (`1 - CU Enclosure Mfg in Progress`, `2 - CU Subsystems Assembled`).
 
 ### Workflow 3: On Form Validation & Safety Guard
 - **File**: `scripts/05_devices/form_devices/3_Devices_onvalidate.deluge`
@@ -117,8 +110,8 @@
   - Step 2: Sanitize `Serial_Number` (trim & uppercase).
   - Step 3: Duplicate check: Query `Devices` to prevent duplicate serial numbers.
   - Step 4: Verify syntax: Serial number must contain "CU" or "OV", and begin with valid prefix.
-  - Step 5: Safety fallback: Ensure `Device_Type`, `Product_Model` lookup (queries `Product_Models` for matching model ID if unassigned), `Lot` lookup (fallback to latest created lot from `Lots`), initial `Device_Stage` (`"0 - CU Mfg Not Yet Started"` or `"0 - OV Mfg Not Yet Started"`), and `Device_State` ("Available in Stock") are populated.
-  - Step 6: Bulk Edit & Compatibility Guard: Prevents assigning Overlay stages to Control Units or Control Unit stages to Overlays, protecting against mismatched stage assignments during report bulk edits.
+  - Step 5: Safety fallback: Ensure `Device_Type`, `Product_Model` lookup (queries `Product_Models` for matching model ID if unassigned), `Lot` lookup (fallback to latest created lot from `Lots`), initial `Device_Stage` (`"0 - Mfg Not Yet Started"`), and `Device_State` ("Available in Stock") are populated.
+  - Step 6: Bulk Edit & Compatibility Guard: Prevents assigning Overlay-specific Stages 1–2 to Control Units or Control Unit-specific Stages 1–2 to Overlays.
 
 ### Workflow 4: On Form Submission Success
 - **File**: `scripts/05_devices/form_devices/4_Devices_onsuccess.deluge`
@@ -148,9 +141,9 @@ To provide high-speed, user-friendly batch processing without relying on Creator
      - Behavior: Interactive field populated by user or pre-filled from `All_Devices` report custom action.
   2. **New Device Stage** `[Dropdown]`
      - Field Link Name: `New_Device_Stage`
-     - Choices: All standard Control Unit and Overlay manufacturing and maintenance stages.
+     - Choices: All 12 unified lifecycle choices (8 shared stages + CU Stages 1–2 + OV Stages 1–2).
 - **Automated Harmonization Principle**:
-  - By default, if the batch contains mixed hardware types (Control Units and Overlays), the submit workflow automatically maps the selected stage to the counterpart stage for the respective hardware (e.g. selecting `5 - CU Assembly Completed & Not Tested` automatically applies `5 - OV Assembly Completed & Not Tested` to any Overlays in the batch).
+  - By default, if the batch contains mixed hardware types (Control Units and Overlays), shared stages (`0`, `3`, `4`, `5`, `6 - Ready Condition`, `Retesting Needed`, `Repair Needed`, `Disinfection Needed`) apply identically to all devices, while hardware-specific Stages 1–2 automatically map to the counterpart stage for the respective hardware (e.g. `1 - CU Enclosure Mfg in Progress` $\leftrightarrow$ `1 - OV in Screen Printing / Welding`).
 - **Workflows**:
   - **On Load**: `scripts/05_devices/stateless_update_stage/1_Update_Device_Stage_onload.deluge`
     - Evaluates pre-filled selection if passed from report.

@@ -5,12 +5,10 @@
 // File Path    : scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge
 // Fields Used  : [Select_Devices, New_Device_Stage]
 // Cross-Forms  : [Devices]
-// Purpose      : Validates selected devices and target stage. Fetches device records
-//                in a single batch query, iterates through each device, and applies
-//                the target stage. Automatically harmonizes stage choices between
-//                Control Units and Overlays (e.g. converting a CU stage to its exact
-//                counterpart OV stage for any Overlays in the batch). Updates all
-//                records and redirects cleanly to All_Devices report.
+// Purpose      : Validates selected devices and target stage. Fetches device
+//                records in a single batch query and applies the target stage,
+//                harmonizing hardware-specific Stages 1 and 2 between Control
+//                Units and Overlays while applying shared stages uniformly.
 // Optimization : Single batch fetch [ID in dev_ids] prevents statement exhaustion.
 //                Safe and efficient for 100+ units in a single operation.
 // ==============================================================================
@@ -41,7 +39,7 @@ if(is_valid)
     }
     else
     {
-        // 3. Batch Update with Automatic Hardware Stage Harmonization
+        // 3. Batch Update with Hardware Stage Harmonization for Stages 1 and 2
         stg = input.New_Device_Stage;
         updated_count = 0;
         
@@ -64,92 +62,27 @@ if(is_valid)
                 }
             }
             
-            // CASE 1: Device is an OVERLAY, but user selected a CONTROL UNIT stage
-            if(d_type == "Overlay" && stg.contains("CU"))
+            // Convert only hardware-specific Stages 1 and 2 when mixed hardware is selected
+            if(d_type == "Overlay")
             {
-                if(stg == "0 - CU Mfg Not Yet Started")
+                if(stg == "1 - CU Enclosure Mfg in Progress")
                 {
-                    target_stg = "0 - OV Mfg Not Yet Started";
-                }
-                else if(stg == "1 - CU Enclosure Mfg in Progress")
-                {
-                    target_stg = "1 - OV in Screen printing/Welding";
+                    target_stg = "1 - OV in Screen Printing / Welding";
                 }
                 else if(stg == "2 - CU Subsystems Assembled")
                 {
                     target_stg = "2 - OV in Stitching";
                 }
-                else if(stg == "3 - CU Yet to Assemble")
-                {
-                    target_stg = "3 - OV Yet to Assemble";
-                }
-                else if(stg == "4 - CU Assembly in Progress")
-                {
-                    target_stg = "4 - OV Assembly In Progress";
-                }
-                else if(stg == "5 - CU Assembly Completed & Not Tested")
-                {
-                    target_stg = "5 - OV Assembly Completed & Not Tested";
-                }
-                else if(stg == "6 - CU Ready Condition")
-                {
-                    target_stg = "6 - OV Ready Condition";
-                }
-                else if(stg == "CU Retesting Needed")
-                {
-                    target_stg = "OV Retesting Needed";
-                }
-                else if(stg == "CU Repair Needed")
-                {
-                    target_stg = "OV Repair Needed";
-                }
-                else if(stg == "CU Disinfection Needed")
-                {
-                    target_stg = "OV Disinfection Needed";
-                }
             }
-            // CASE 2: Device is a CONTROL UNIT, but user selected an OVERLAY stage
-            else if(d_type == "Control Unit" && stg.contains("OV"))
+            else if(d_type == "Control Unit")
             {
-                if(stg == "0 - OV Mfg Not Yet Started")
-                {
-                    target_stg = "0 - CU Mfg Not Yet Started";
-                }
-                else if(stg == "1 - OV in Screen printing/Welding")
+                if(stg == "1 - OV in Screen Printing / Welding")
                 {
                     target_stg = "1 - CU Enclosure Mfg in Progress";
                 }
                 else if(stg == "2 - OV in Stitching")
                 {
                     target_stg = "2 - CU Subsystems Assembled";
-                }
-                else if(stg == "3 - OV Yet to Assemble")
-                {
-                    target_stg = "3 - CU Yet to Assemble";
-                }
-                else if(stg == "4 - OV Assembly In Progress")
-                {
-                    target_stg = "4 - CU Assembly in Progress";
-                }
-                else if(stg == "5 - OV Assembly Completed & Not Tested")
-                {
-                    target_stg = "5 - CU Assembly Completed & Not Tested";
-                }
-                else if(stg == "6 - OV Ready Condition")
-                {
-                    target_stg = "6 - CU Ready Condition";
-                }
-                else if(stg == "OV Retesting Needed")
-                {
-                    target_stg = "CU Retesting Needed";
-                }
-                else if(stg == "OV Repair Needed")
-                {
-                    target_stg = "CU Repair Needed";
-                }
-                else if(stg == "OV Disinfection Needed")
-                {
-                    target_stg = "CU Disinfection Needed";
                 }
             }
             

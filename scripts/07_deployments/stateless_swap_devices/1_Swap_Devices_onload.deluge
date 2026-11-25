@@ -1,0 +1,57 @@
+// ==============================================================================
+// Module Name  : Swap Devices (Form Link Name: Swap_Devices)
+// Script Type  : Stateless Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/07_deployments/stateless_swap_devices/1_Swap_Devices_onload.deluge
+// Fields Used  : [Deployment, Control_Unit, Overlay, Swap_Date, Collected, Return_Office, Condition]
+// Cross-Forms  : [Deployments]
+// Purpose      : Initializes Swap_Devices modal. Defaults Swap_Date to today,
+//                keeps Condition visible and defaulted to Disinfection Needed,
+//                hides Return_Office unless Collected? is checked, and pre-fills
+//                Control_Unit and Overlay when Deployment is passed via URL.
+// Optimization : Single indexed PK lookup only when Deployment is pre-filled.
+// ==============================================================================
+
+// 1. Default Swap_Date to today if empty
+if(input.Swap_Date == null)
+{
+    input.Swap_Date = zoho.currentdate;
+}
+
+// 2. Keep Condition always visible and default to Disinfection Needed
+show Condition;
+enable Condition;
+if(input.Condition == null || input.Condition == "")
+{
+    input.Condition = "Disinfection Needed";
+}
+
+// 3. Hide Return_Office unless Collected? is already checked
+if(input.Collected == true)
+{
+    show Return_Office;
+    enable Return_Office;
+}
+else
+{
+    hide Return_Office;
+}
+
+// 4. Pre-populate Control_Unit and Overlay if Deployment was passed in URL
+if(input.Deployment != null)
+{
+    target_dep_id = input.Deployment;
+    dep = Deployments[ID == target_dep_id];
+    if(dep == null || dep.Deployment_State == "Closed")
+    {
+        alert "Swap Blocked: The selected deployment is closed or no longer exists.";
+        input.Deployment = null;
+        input.Control_Unit = null;
+        input.Overlay = null;
+    }
+    else
+    {
+        input.Control_Unit = dep.Control_Unit;
+        input.Overlay = dep.Overlay;
+    }
+}

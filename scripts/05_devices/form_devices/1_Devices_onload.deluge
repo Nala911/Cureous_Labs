@@ -88,32 +88,32 @@ else
     if(dev_type == "Control Unit")
     {
         cu_stages = list();
-        cu_stages.add("0 - CU Mfg Not Yet Started");
+        cu_stages.add("0 - Mfg Not Yet Started");
         cu_stages.add("1 - CU Enclosure Mfg in Progress");
         cu_stages.add("2 - CU Subsystems Assembled");
-        cu_stages.add("3 - CU Yet to Assemble");
-        cu_stages.add("4 - CU Assembly in Progress");
-        cu_stages.add("5 - CU Assembly Completed & Not Tested");
-        cu_stages.add("6 - CU Ready Condition");
-        cu_stages.add("CU Retesting Needed");
-        cu_stages.add("CU Repair Needed");
-        cu_stages.add("CU Disinfection Needed");
+        cu_stages.add("3 - Yet to Assemble");
+        cu_stages.add("4 - Assembly in Progress");
+        cu_stages.add("5 - Assembly Completed & Not Tested");
+        cu_stages.add("6 - Ready Condition");
+        cu_stages.add("Retesting Needed");
+        cu_stages.add("Repair Needed");
+        cu_stages.add("Disinfection Needed");
         
         Device_Stage:ui.add(cu_stages);
     }
     else if(dev_type == "Overlay")
     {
         ov_stages = list();
-        ov_stages.add("0 - OV Mfg Not Yet Started");
-        ov_stages.add("1 - OV in Screen printing/Welding");
+        ov_stages.add("0 - Mfg Not Yet Started");
+        ov_stages.add("1 - OV in Screen Printing / Welding");
         ov_stages.add("2 - OV in Stitching");
-        ov_stages.add("3 - OV Yet to Assemble");
-        ov_stages.add("4 - OV Assembly In Progress");
-        ov_stages.add("5 - OV Assembly Completed & Not Tested");
-        ov_stages.add("6 - OV Ready Condition");
-        ov_stages.add("OV Retesting Needed");
-        ov_stages.add("OV Repair Needed");
-        ov_stages.add("OV Disinfection Needed");
+        ov_stages.add("3 - Yet to Assemble");
+        ov_stages.add("4 - Assembly in Progress");
+        ov_stages.add("5 - Assembly Completed & Not Tested");
+        ov_stages.add("6 - Ready Condition");
+        ov_stages.add("Retesting Needed");
+        ov_stages.add("Repair Needed");
+        ov_stages.add("Disinfection Needed");
         
         Device_Stage:ui.add(ov_stages);
     }

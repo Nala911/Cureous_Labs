@@ -118,29 +118,23 @@ if(input.Lot == null)
 // Safety Fallback for Initial Device Stage
 if(input.Device_Stage == null || input.Device_Stage == "")
 {
-    if(input.Device_Type == "Control Unit")
-    {
-        input.Device_Stage = "0 - CU Mfg Not Yet Started";
-    }
-    else if(input.Device_Type == "Overlay")
-    {
-        input.Device_Stage = "0 - OV Mfg Not Yet Started";
-    }
+    input.Device_Stage = "0 - Mfg Not Yet Started";
 }
 else
 {
-    // Hardware & Stage Compatibility Guard (Crucial for Bulk Edit Protection)
-    is_cu_stage = input.Device_Stage.contains("CU");
-    is_ov_stage = input.Device_Stage.contains("OV");
+    // Hardware & Stage Compatibility Guard (Stages 1 and 2 only; shared stages apply to both)
+    stg = input.Device_Stage;
+    is_cu_only = (stg == "1 - CU Enclosure Mfg in Progress" || stg == "2 - CU Subsystems Assembled");
+    is_ov_only = (stg == "1 - OV in Screen Printing / Welding" || stg == "2 - OV in Stitching");
     
-    if(input.Device_Type == "Control Unit" && is_ov_stage)
+    if(input.Device_Type == "Control Unit" && is_ov_only)
     {
-        alert "Stage Mismatch Error:\n\nCannot assign an Overlay stage (" + input.Device_Stage + ") to Control Unit '" + input.Serial_Number + "'.";
+        alert "Stage Mismatch Error:\n\nCannot assign an Overlay-specific stage (" + stg + ") to Control Unit '" + input.Serial_Number + "'.";
         cancel submit;
     }
-    else if(input.Device_Type == "Overlay" && is_cu_stage)
+    else if(input.Device_Type == "Overlay" && is_cu_only)
     {
-        alert "Stage Mismatch Error:\n\nCannot assign a Control Unit stage (" + input.Device_Stage + ") to Overlay '" + input.Serial_Number + "'.";
+        alert "Stage Mismatch Error:\n\nCannot assign a Control Unit-specific stage (" + stg + ") to Overlay '" + input.Serial_Number + "'.";
         cancel submit;
     }
 }

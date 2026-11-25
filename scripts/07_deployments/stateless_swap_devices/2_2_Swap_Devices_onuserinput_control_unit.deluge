@@ -1,0 +1,67 @@
+// ==============================================================================
+// Module Name  : Swap Devices (Form Link Name: Swap_Devices)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Control_Unit -> On User Input
+// File Path    : scripts/07_deployments/stateless_swap_devices/2_2_Swap_Devices_onuserinput_control_unit.deluge
+// Fields Used  : [Deployment, Control_Unit]
+// Cross-Forms  : [Deployments, Devices]
+// Purpose      : Validates that the selected asset is a Control Unit. If it is
+//                a new replacement unit (different from the source deployment),
+//                enforces "6 - Ready Condition", "Available in Stock", and no
+//                active deployment conflict.
+// Optimization : Targeted PK lookups only. Runs in <15ms.
+// ==============================================================================
+
+if(input.Control_Unit != null)
+{
+    target_cu_id = input.Control_Unit;
+    cu_dev = Devices[ID == target_cu_id];
+    
+    if(cu_dev != null)
+    {
+        if(cu_dev.Device_Type != "Control Unit")
+        {
+            alert "Invalid Selection: The selected asset (" + cu_dev.Serial_Number + ") is an Overlay, not a Control Unit.";
+            input.Control_Unit = null;
+        }
+        else
+        {
+            // Determine whether this is the unit already assigned to the selected deployment
+            is_retained = false;
+            curr_dep_id = 0;
+            if(input.Deployment != null)
+            {
+                curr_dep_id = input.Deployment;
+                src_dep = Deployments[ID == curr_dep_id];
+                if(src_dep != null && src_dep.Control_Unit == target_cu_id)
+                {
+                    is_retained = true;
+                }
+            }
+            
+            // Enforce readiness and double-booking checks on new replacement units
+            if(!is_retained)
+            {
+                if(cu_dev.Device_Stage != "6 - Ready Condition")
+                {
+                    alert "Not Ready for Swap: Control Unit " + cu_dev.Serial_Number + " is at stage '" + cu_dev.Device_Stage + "' (requires '6 - Ready Condition').";
+                    input.Control_Unit = null;
+                }
+                else if(cu_dev.Device_State != "Available in Stock")
+                {
+                    alert "Device Unavailable: Control Unit " + cu_dev.Serial_Number + " is currently '" + cu_dev.Device_State + "' (requires 'Available in Stock').";
+                    input.Control_Unit = null;
+                }
+                else
+                {
+                    open_cu_logs = Deployments[ID != curr_dep_id && Control_Unit == target_cu_id && Deployment_State != "Closed"];
+                    if(open_cu_logs.count() > 0)
+                    {
+                        alert "Conflict Detected: Control Unit " + cu_dev.Serial_Number + " is already deployed in another active deployment.";
+                        input.Control_Unit = null;
+                    }
+                }
+            }
+        }
+    }
+}

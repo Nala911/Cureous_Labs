@@ -1,0 +1,22 @@
+// ==============================================================================
+// Module Name  : Close Deployments (Form Link Name: Close_Deployments)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Collected -> On User Input
+// File Path    : scripts/07_deployments/stateless_close_deployments/2_1_Close_Deployments_onuserinput_collected.deluge
+// Fields Used  : [Collected, Return_Office]
+// Cross-Forms  : []
+// Purpose      : Dynamically shows Return_Office when Collected? is checked,
+//                or hides and clears Return_Office when unchecked.
+// Optimization : Pure UI event. Zero database queries.
+// ==============================================================================
+
+if(input.Collected == true)
+{
+    show Return_Office;
+    enable Return_Office;
+}
+else
+{
+    hide Return_Office;
+    input.Return_Office = null;
+}

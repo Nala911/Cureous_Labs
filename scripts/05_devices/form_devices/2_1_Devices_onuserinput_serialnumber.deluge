@@ -7,7 +7,7 @@
 // Cross-Forms  : [Devices, Product_Models]
 // Purpose      : Validates Serial Number syntax, checks for duplicates,
 //                auto-derives Device Type, resolves and sets Product Model lookup from Product_Models,
-//                sets initial Device Stage ("0 - CU Mfg Not Yet Started" or "0 - OV Mfg Not Yet Started"),
+//                sets initial Device Stage ("0 - Mfg Not Yet Started"),
 //                and sets initial Device State to "Available in Stock".
 // Optimization : Single indexed query for duplicate check, single indexed query for
 //                Product Model resolution. Runs in <10ms. Zero UI lag.
@@ -69,17 +69,16 @@ if(input.Serial_Number != null && input.Serial_Number != "")
             }
             else
             {
-                // 4. Set Derived Device Type & Auto-Initialize Initial Stage 0
+                // 4. Set Derived Device Type & Auto-Initialize Unified Stage 0
                 if(is_cu)
                 {
                     input.Device_Type = "Control Unit";
-                    input.Device_Stage = "0 - CU Mfg Not Yet Started";
                 }
                 else if(is_ov)
                 {
                     input.Device_Type = "Overlay";
-                    input.Device_Stage = "0 - OV Mfg Not Yet Started";
                 }
+                input.Device_Stage = "0 - Mfg Not Yet Started";
                 
                 // 5. Assign Product Model Lookup ID Dynamically from Product_Models (User can edit/reassign)
                 input.Product_Model = null;

@@ -1,0 +1,37 @@
+// ==============================================================================
+// Module Name  : Close Deployments (Form Link Name: Close_Deployments)
+// Script Type  : Stateless Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/07_deployments/stateless_close_deployments/1_Close_Deployments_onload.deluge
+// Fields Used  : [Deployments, End_Date, Collected, Return_Office, Condition]
+// Cross-Forms  : []
+// Purpose      : Initializes the Close_Deployments modal. Defaults End_Date to
+//                today, defaults Condition to Disinfection Needed (always shown),
+//                and hides Return_Office until Collected? is checked.
+// Optimization : Zero database queries. Pure UI state setup.
+// ==============================================================================
+
+// 1. Default End_Date to today if empty
+if(input.End_Date == null)
+{
+    input.End_Date = zoho.currentdate;
+}
+
+// 2. Keep Condition always visible and default to Disinfection Needed
+show Condition;
+enable Condition;
+if(input.Condition == null || input.Condition == "")
+{
+    input.Condition = "Disinfection Needed";
+}
+
+// 3. Hide Return_Office unless Collected? is already checked
+if(input.Collected == true)
+{
+    show Return_Office;
+    enable Return_Office;
+}
+else
+{
+    hide Return_Office;
+}

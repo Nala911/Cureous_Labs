@@ -1,0 +1,131 @@
+// ==============================================================================
+// Module Name  : Close Deployments (Form Link Name: Close_Deployments)
+// Script Type  : Stateless Form Action (On Click of Submit)
+// Trigger Hook : Form Actions -> Submit Button -> On Click
+// File Path    : scripts/07_deployments/stateless_close_deployments/5_1_Close_Deployments_onclick_submit.deluge
+// Fields Used  : [Deployments, End_Date, Collected, Return_Office, Condition]
+// Cross-Forms  : [Deployments, Devices]
+// Purpose      : Validates inputs, batch-closes selected active deployments with
+//                End_Date, and batch-updates linked Control Unit and Overlay
+//                assets in Devices: sets Device_Stage = Condition; when
+//                Collected? is checked sets Available in Stock, clears
+//                Current_Customer, and assigns Current_Office; when unchecked
+//                sets Idle with Customer, clears Current_Office, and keeps
+//                Current_Customer unchanged.
+// Optimization : Two batch queries ([ID in dep_ids] and [ID in dev_ids]) prevent
+//                loop queries and statement exhaustion for 100+ deployments.
+// ==============================================================================
+
+// 1. Mandatory Input Validation
+is_valid = true;
+
+if(input.Deployments == null || input.Deployments.isEmpty())
+{
+    alert "Please select at least one deployment to close.";
+    is_valid = false;
+}
+else if(input.End_Date == null)
+{
+    alert "End Date is mandatory when closing deployments.";
+    is_valid = false;
+}
+else if(input.Condition == null || input.Condition == "")
+{
+    alert "Condition is mandatory when closing deployments.";
+    is_valid = false;
+}
+else if(input.Collected == true && input.Return_Office == null)
+{
+    alert "Please select the Return Office since Collected? is checked.";
+    is_valid = false;
+}
+
+if(is_valid)
+{
+    // 2. Single Batch Query to retrieve all selected deployment records
+    dep_ids = input.Deployments;
+    selected_deps = Deployments[ID in dep_ids];
+    
+    if(selected_deps.count() == 0)
+    {
+        alert "No matching deployment records found for the selected IDs.";
+    }
+    else
+    {
+        // 3. Date Integrity Pre-Check across all active deployments
+        close_date = input.End_Date;
+        date_error = false;
+        
+        for each dep in selected_deps
+        {
+            if(dep.Deployment_State != "Closed" && dep.Start_Date != null && close_date < dep.Start_Date)
+            {
+                alert "Invalid End Date: End Date cannot be earlier than Start Date (" + dep.Start_Date + ") for one or more selected deployments.";
+                date_error = true;
+            }
+        }
+        
+        if(!date_error)
+        {
+            // 4. Batch-Close Active Deployments & Collect Affected Device IDs
+            dev_ids = list();
+            closed_count = 0;
+            
+            for each dep in selected_deps
+            {
+                if(dep.Deployment_State != "Closed")
+                {
+                    dep.Deployment_State = "Closed";
+                    dep.End_Date = close_date;
+                    closed_count = closed_count + 1;
+                    
+                    if(dep.Control_Unit != null)
+                    {
+                        cu_id = dep.Control_Unit;
+                        if(!dev_ids.contains(cu_id))
+                        {
+                            dev_ids.add(cu_id);
+                        }
+                    }
+                    if(dep.Overlay != null)
+                    {
+                        ov_id = dep.Overlay;
+                        if(!dev_ids.contains(ov_id))
+                        {
+                            dev_ids.add(ov_id);
+                        }
+                    }
+                }
+            }
+            
+            // 5. Single Batch Query & Update for Linked Devices
+            if(dev_ids.size() > 0)
+            {
+                affected_devs = Devices[ID in dev_ids];
+                is_collected = (input.Collected == true);
+                target_office = input.Return_Office;
+                target_condition = input.Condition;
+                
+                for each dev in affected_devs
+                {
+                    dev.Device_Stage = target_condition;
+                    if(is_collected)
+                    {
+                        dev.Device_State = "Available in Stock";
+                        dev.Current_Customer = null;
+                        dev.Current_Office = target_office;
+                    }
+                    else
+                    {
+                        dev.Device_State = "Idle with Customer";
+                        dev.Current_Office = null;
+                    }
+                }
+            }
+            
+            // 6. User Feedback & View Refresh
+            alert "Successfully closed " + closed_count + " deployment(s).";
+            openUrl("#Report:All_Deployments", "same window");
+        }
+    }
+}

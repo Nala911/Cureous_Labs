@@ -2,12 +2,12 @@
 // Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Control_Unit -> On User Input
-// File Path    : scripts/07_deployments/2_1_Deployments_onuserinput_control_unit.deluge
+// File Path    : scripts/07_deployments/form_deployments/2_1_Deployments_onuserinput_control_unit.deluge
 // Fields Used  : [Control_Unit]
 // Cross-Forms  : [Devices]
-// Purpose      : Validates selected hardware is a Control Unit pump. Alerts if
-//                mismatched and clears field. In Add mode, warns if the pump is
-//                currently recorded as active elsewhere.
+// Purpose      : Validates selected hardware is a Control Unit pump. In Add mode,
+//                verifies the pump is in "6 - Ready Condition" and "Available in Stock".
+//                Alerts and clears field if mismatched or ineligible.
 // Optimization : Single indexed PK lookup by ID. Executes in <10ms.
 // ==============================================================================
 
@@ -27,13 +27,18 @@ if(input.Control_Unit != null)
         }
         else
         {
-            // 2. Alert technician if device is currently marked active elsewhere
+            // 2. In Add mode, enforce readiness & availability gate
             if(input.ID == null)
             {
-                current_state = cu_dev.Device_State;
-                if(current_state == "Rentally Active" || current_state == "Active in Demo" || current_state == "Idle with Customer")
+                if(cu_dev.Device_Stage != "6 - Ready Condition")
                 {
-                    alert "Warning: Control Unit " + cu_dev.Serial_Number + " is currently marked as '" + current_state + "'. Please ensure the previous deployment was closed.";
+                    alert "Not Ready for Deployment: Control Unit " + cu_dev.Serial_Number + " is currently at stage '" + cu_dev.Device_Stage + "' (requires '6 - Ready Condition').";
+                    input.Control_Unit = null;
+                }
+                else if(cu_dev.Device_State != "Available in Stock")
+                {
+                    alert "Device Unavailable: Control Unit " + cu_dev.Serial_Number + " is currently '" + cu_dev.Device_State + "' (requires 'Available in Stock').";
+                    input.Control_Unit = null;
                 }
             }
         }

@@ -2,7 +2,7 @@
 // Module Name  : Deployments (Form Link Name: Deployments)
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Deployment_State -> On User Input
-// File Path    : scripts/07_deployments/2_3_Deployments_onuserinput_deployment_state.deluge
+// File Path    : scripts/07_deployments/form_deployments/2_3_Deployments_onuserinput_deployment_state.deluge
 // Fields Used  : [Deployment_State, End_Date]
 // Cross-Forms  : []
 // Purpose      : Controls End_Date visibility and value when Deployment_State

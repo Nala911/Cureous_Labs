@@ -1,0 +1,23 @@
+// ==============================================================================
+// Module Name  : Swap Devices (Form Link Name: Swap_Devices)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Collected -> On User Input
+// File Path    : scripts/07_deployments/stateless_swap_devices/2_4_Swap_Devices_onuserinput_collected.deluge
+// Fields Used  : [Collected, Return_Office]
+// Cross-Forms  : []
+// Purpose      : Dynamically shows Return_Office when Collected? is checked,
+//                or hides and clears Return_Office when unchecked. Condition
+//                remains visible regardless of Collected? state.
+// Optimization : Pure UI event. Zero database queries.
+// ==============================================================================
+
+if(input.Collected == true)
+{
+    show Return_Office;
+    enable Return_Office;
+}
+else
+{
+    hide Return_Office;
+    input.Return_Office = null;
+}
