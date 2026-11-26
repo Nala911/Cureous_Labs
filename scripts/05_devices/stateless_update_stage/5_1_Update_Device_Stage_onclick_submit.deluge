@@ -39,60 +39,81 @@ if(is_valid)
     }
     else
     {
-        // 3. Batch Update with Hardware Stage Harmonization for Stages 1 and 2
-        stg = input.New_Device_Stage;
-        updated_count = 0;
-        
-        for each dev in selected_devs
+        // 3. Guard against actively deployed devices before applying any updates
+        active_blocked = "";
+        for each dev_check in selected_devs
         {
-            d_type = dev.Device_Type;
-            target_stg = stg;
-            
-            // Fallback detection from serial number if Device_Type is not populated
-            if(d_type == null || d_type == "")
+            if(dev_check.Device_State == "Rentally Active" || dev_check.Device_State == "Active in Demo")
             {
-                sn = dev.Serial_Number;
-                if(sn != null && sn.contains("CU"))
+                if(active_blocked != "")
                 {
-                    d_type = "Control Unit";
+                    active_blocked = active_blocked + ", ";
                 }
-                else if(sn != null && sn.contains("OV"))
-                {
-                    d_type = "Overlay";
-                }
+                active_blocked = active_blocked + dev_check.Serial_Number;
             }
-            
-            // Convert only hardware-specific Stages 1 and 2 when mixed hardware is selected
-            if(d_type == "Overlay")
-            {
-                if(stg == "1 - CU Enclosure Mfg in Progress")
-                {
-                    target_stg = "1 - OV in Screen Printing / Welding";
-                }
-                else if(stg == "2 - CU Subsystems Assembled")
-                {
-                    target_stg = "2 - OV in Stitching";
-                }
-            }
-            else if(d_type == "Control Unit")
-            {
-                if(stg == "1 - OV in Screen Printing / Welding")
-                {
-                    target_stg = "1 - CU Enclosure Mfg in Progress";
-                }
-                else if(stg == "2 - OV in Stitching")
-                {
-                    target_stg = "2 - CU Subsystems Assembled";
-                }
-            }
-            
-            // Direct property update on fetched record
-            dev.Device_Stage = target_stg;
-            updated_count = updated_count + 1;
         }
         
-        // 4. User Feedback & View Refresh
-        alert "Successfully updated stage for " + updated_count + " device(s).";
-        openUrl("#Report:All_Devices", "same window");
+        if(active_blocked != "")
+        {
+            alert "Update Stage Blocked:\n\nActive deployed device(s) cannot change stage here: " + active_blocked + ".\nPlease use Close Deployments or Swap Devices first.";
+        }
+        else
+        {
+            // 4. Batch Update with Hardware Stage Harmonization for Stages 1 and 2
+            stg = input.New_Device_Stage;
+            updated_count = 0;
+            
+            for each dev in selected_devs
+            {
+                d_type = dev.Device_Type;
+                target_stg = stg;
+                
+                // Fallback detection from serial number if Device_Type is not populated
+                if(d_type == null || d_type == "")
+                {
+                    sn = dev.Serial_Number;
+                    if(sn != null && sn.contains("CU"))
+                    {
+                        d_type = "Control Unit";
+                    }
+                    else if(sn != null && sn.contains("OV"))
+                    {
+                        d_type = "Overlay";
+                    }
+                }
+                
+                // Convert only hardware-specific Stages 1 and 2 when mixed hardware is selected
+                if(d_type == "Overlay")
+                {
+                    if(stg == "1 - CU Enclosure Mfg in Progress")
+                    {
+                        target_stg = "1 - OV in Screen Printing / Welding";
+                    }
+                    else if(stg == "2 - CU Subsystems Assembled")
+                    {
+                        target_stg = "2 - OV in Stitching";
+                    }
+                }
+                else if(d_type == "Control Unit")
+                {
+                    if(stg == "1 - OV in Screen Printing / Welding")
+                    {
+                        target_stg = "1 - CU Enclosure Mfg in Progress";
+                    }
+                    else if(stg == "2 - OV in Stitching")
+                    {
+                        target_stg = "2 - CU Subsystems Assembled";
+                    }
+                }
+                
+                // Direct property update on fetched record
+                dev.Device_Stage = target_stg;
+                updated_count = updated_count + 1;
+            }
+            
+            // 5. User Feedback & View Refresh
+            alert "Successfully updated stage for " + updated_count + " device(s).";
+            openUrl("#Report:All_Devices", "same window");
+        }
     }
 }

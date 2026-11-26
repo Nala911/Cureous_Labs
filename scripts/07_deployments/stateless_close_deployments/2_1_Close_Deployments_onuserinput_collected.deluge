@@ -4,10 +4,10 @@
 // Trigger Hook : Field Actions -> Collected -> On User Input
 // File Path    : scripts/07_deployments/stateless_close_deployments/2_1_Close_Deployments_onuserinput_collected.deluge
 // Fields Used  : [Collected, Return_Office]
-// Cross-Forms  : []
-// Purpose      : Dynamically shows Return_Office when Collected? is checked,
-//                or hides and clears Return_Office when unchecked.
-// Optimization : Pure UI event. Zero database queries.
+// Cross-Forms  : None
+// Purpose      : Dynamically shows and enables Return_Office when Collected? is
+//                checked, or hides and clears Return_Office when unchecked.
+// Optimization : Zero database queries. Runs in <1ms.
 // ==============================================================================
 
 if(input.Collected == true)

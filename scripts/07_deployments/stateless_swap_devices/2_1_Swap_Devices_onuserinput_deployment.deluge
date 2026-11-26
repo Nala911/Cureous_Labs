@@ -3,18 +3,29 @@
 // Script Type  : Stateless Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Deployment -> On User Input
 // File Path    : scripts/07_deployments/stateless_swap_devices/2_1_Swap_Devices_onuserinput_deployment.deluge
-// Fields Used  : [Deployment, Control_Unit, Overlay]
-// Cross-Forms  : [Deployments]
-// Purpose      : Auto-populates Control_Unit and Overlay from the selected active
-//                deployment, or clears both when Deployment is cleared. Guards
-//                against selecting a Closed deployment.
-// Optimization : Single indexed PK lookup by ID. Runs in <10ms.
+// Fields Used  : [Deployment, Control_Unit, Overlay, Collected, Return_Office, Device_Condition]
+// Cross-Forms  : [Deployments, Devices]
+// Purpose      : Enables and dynamically filters Control_Unit and Overlay to
+//                [current deployment unit] + [6 - Ready Condition & Available in
+//                Stock], auto-populates current devices, or clears/disables them
+//                when Deployment is cleared. Resets swap-out return visibility.
+// Optimization : Targeted PK lookup plus two indexed device list queries.
 // ==============================================================================
+
+// Reset return-tracking fields whenever source Deployment changes
+input.Collected = false;
+input.Return_Office = null;
+input.Device_Condition = "Disinfection Needed";
+hide Collected;
+hide Return_Office;
+hide Device_Condition;
 
 if(input.Deployment == null)
 {
     input.Control_Unit = null;
     input.Overlay = null;
+    disable Control_Unit;
+    disable Overlay;
 }
 else
 {
@@ -26,9 +37,51 @@ else
         input.Deployment = null;
         input.Control_Unit = null;
         input.Overlay = null;
+        disable Control_Unit;
+        disable Overlay;
     }
     else
     {
+        ready_cu_ids = Devices[Device_Type == "Control Unit" && Device_Stage == "6 - Ready Condition" && Device_State == "Available in Stock"].ID.getAll();
+        cu_choices = list();
+        if(dep.Control_Unit != null)
+        {
+            cu_choices.add(dep.Control_Unit);
+        }
+        for each rcu in ready_cu_ids
+        {
+            if(!cu_choices.contains(rcu))
+            {
+                cu_choices.add(rcu);
+            }
+        }
+        clear Control_Unit;
+        if(cu_choices.size() > 0)
+        {
+            Control_Unit:ui.add(cu_choices);
+        }
+        
+        ready_ov_ids = Devices[Device_Type == "Overlay" && Device_Stage == "6 - Ready Condition" && Device_State == "Available in Stock"].ID.getAll();
+        ov_choices = list();
+        if(dep.Overlay != null)
+        {
+            ov_choices.add(dep.Overlay);
+        }
+        for each rov in ready_ov_ids
+        {
+            if(!ov_choices.contains(rov))
+            {
+                ov_choices.add(rov);
+            }
+        }
+        clear Overlay;
+        if(ov_choices.size() > 0)
+        {
+            Overlay:ui.add(ov_choices);
+        }
+        
+        enable Control_Unit;
+        enable Overlay;
         input.Control_Unit = dep.Control_Unit;
         input.Overlay = dep.Overlay;
     }

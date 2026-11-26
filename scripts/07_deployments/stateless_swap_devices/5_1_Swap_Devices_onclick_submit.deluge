@@ -3,12 +3,12 @@
 // Script Type  : Stateless Form Action (On Click of Submit)
 // Trigger Hook : Form Actions -> Submit Button -> On Click
 // File Path    : scripts/07_deployments/stateless_swap_devices/5_1_Swap_Devices_onclick_submit.deluge
-// Fields Used  : [Deployment, Control_Unit, Overlay, Swap_Date, Collected, Return_Office, Condition]
-// Cross-Forms  : [Deployments, Devices]
+// Fields Used  : [Deployment, Control_Unit, Overlay, Swap_Date, Collected, Return_Office, Device_Condition]
+// Cross-Forms  : [Deployments, Devices, Customers]
 // Purpose      : Validates swap inputs and replacement readiness, closes the old
 //                deployment at Swap_Date, inserts a replacement deployment
 //                inheriting Customer and Deployment_State, updates swapped-out
-//                assets with Device_Stage = Condition (and Available in Stock
+//                assets with Device_Stage = Device_Condition (and Available in Stock
 //                at Return_Office when Collected? is checked, or Idle with
 //                Customer retaining Current_Customer when unchecked), and sets
 //                new/retained assets active at the customer.
@@ -16,7 +16,7 @@
 //                avoid loop queries and minimize statement consumption.
 // ==============================================================================
 
-// 1. Mandatory Input Validation
+// 1. Mandatory Base Input Validation (Swap-out condition validated once source units are known)
 is_valid = true;
 
 if(input.Deployment == null)
@@ -34,20 +34,10 @@ else if(input.Swap_Date == null)
     alert "Swap Date is mandatory.";
     is_valid = false;
 }
-else if(input.Condition == null || input.Condition == "")
-{
-    alert "Condition is mandatory for swapped-out device tracking.";
-    is_valid = false;
-}
-else if(input.Collected == true && input.Return_Office == null)
-{
-    alert "Please select the Return Office since Collected? is checked.";
-    is_valid = false;
-}
 
 if(is_valid)
 {
-    // 2. Fetch Source Deployment & Validate State / Dates / Changes
+    // 2. Fetch Source Deployment & Validate State / Dates / Changes / Return Tracking
     target_dep_id = input.Deployment;
     old_dep = Deployments[ID == target_dep_id];
     
@@ -73,9 +63,19 @@ if(is_valid)
         new_ov = input.Overlay;
         swap_dt = input.Swap_Date;
         
+        has_swap_out = (old_cu != null && new_cu != old_cu) || (old_ov != null && new_ov != old_ov);
+        
         if(new_cu == old_cu && new_ov == old_ov)
         {
-            alert "No Changes Detected: Please change or remove at least one device (Control Unit or Overlay) to perform a swap.";
+            alert "No Changes Detected: Please change, add, or remove at least one device (Control Unit or Overlay).";
+        }
+        else if(has_swap_out && (input.Device_Condition == null || input.Device_Condition == ""))
+        {
+            alert "Device Condition is mandatory for swapped-out device tracking.";
+        }
+        else if(has_swap_out && input.Collected == true && input.Return_Office == null)
+        {
+            alert "Please select the Return Office since Collected? is checked.";
         }
         else
         {
@@ -152,7 +152,63 @@ if(is_valid)
             
             if(replacement_ok)
             {
-                // 4. Close Old Deployment & Insert New Deployment
+                // 4. Build Compact Deployment Summary for Replacement Record
+                cust_rec = Customers[ID == old_cust];
+                short_cust = "";
+                if(cust_rec != null && cust_rec.Customer_Name != null)
+                {
+                    raw_words = cust_rec.Customer_Name.trim().toList(" ");
+                    clean_words = list();
+                    for each w in raw_words
+                    {
+                        w_trim = w.trim();
+                        if(w_trim != "" && clean_words.size() < 2)
+                        {
+                            clean_words.add(w_trim);
+                        }
+                    }
+                    if(clean_words.size() >= 2)
+                    {
+                        short_cust = clean_words.get(0) + " " + clean_words.get(1);
+                    }
+                    else if(clean_words.size() == 1)
+                    {
+                        short_cust = clean_words.get(0);
+                    }
+                }
+                
+                active_ids = list();
+                if(new_cu != null)
+                {
+                    active_ids.add(new_cu);
+                }
+                if(new_ov != null && !active_ids.contains(new_ov))
+                {
+                    active_ids.add(new_ov);
+                }
+                
+                dev_serial_map = map();
+                active_devs = list();
+                if(active_ids.size() > 0)
+                {
+                    active_devs = Devices[ID in active_ids];
+                    for each dev in active_devs
+                    {
+                        dev_serial_map.put(dev.ID, dev.Serial_Number);
+                    }
+                }
+                
+                new_summary = short_cust;
+                if(new_cu != null && dev_serial_map.containKey(new_cu))
+                {
+                    new_summary = new_summary + " | " + dev_serial_map.get(new_cu);
+                }
+                if(new_ov != null && dev_serial_map.containKey(new_ov))
+                {
+                    new_summary = new_summary + " | " + dev_serial_map.get(new_ov);
+                }
+                
+                // 5. Close Old Deployment & Insert New Deployment
                 old_dep.Deployment_State = "Closed";
                 old_dep.End_Date = swap_dt;
                 
@@ -163,6 +219,7 @@ if(is_valid)
                     Overlay = new_ov
                     Start_Date = swap_dt
                     Deployment_State = old_state
+                    Deployment_Summary = new_summary
                 ]
                 
                 // 5. Batch-Update Swapped-Out Devices
@@ -181,7 +238,7 @@ if(is_valid)
                     swapped_out_devs = Devices[ID in out_ids];
                     is_collected = (input.Collected == true);
                     target_office = input.Return_Office;
-                    target_condition = input.Condition;
+                    target_condition = input.Device_Condition;
                     
                     for each dev in swapped_out_devs
                     {
@@ -200,7 +257,7 @@ if(is_valid)
                     }
                 }
                 
-                // 6. Batch-Update New & Retained Active Devices
+                // 7. Update New & Retained Active Devices
                 target_active_state = "Rentally Active";
                 if(old_state == "Demo")
                 {
@@ -211,19 +268,8 @@ if(is_valid)
                     target_active_state = "Idle with Customer";
                 }
                 
-                active_ids = list();
-                if(new_cu != null)
-                {
-                    active_ids.add(new_cu);
-                }
-                if(new_ov != null && !active_ids.contains(new_ov))
-                {
-                    active_ids.add(new_ov);
-                }
-                
                 if(active_ids.size() > 0)
                 {
-                    active_devs = Devices[ID in active_ids];
                     for each dev in active_devs
                     {
                         dev.Device_State = target_active_state;

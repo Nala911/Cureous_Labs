@@ -4,25 +4,61 @@
 // Trigger Hook : Form Actions -> On Load
 // File Path    : scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge
 // Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
-// Cross-Forms  : None
-// Purpose      : Initializes the stateless custody transfer form. Dynamically
-//                adjusts visibility of Target_Office and Target_Customer based
-//                on the initial state of Destination_Type.
-// Optimization : Pure UI rule. Zero database queries. Runs in <1ms.
+// Cross-Forms  : [Devices]
+// Purpose      : Hides Target_Office and Target_Customer by default until a
+//                Destination_Type is chosen, and dynamically filters Select_Devices
+//                via Deluge to exclude actively deployed devices while preserving
+//                eligible URL pre-fills.
+// Optimization : Single indexed list query on Devices. Runs in <10ms.
 // ==============================================================================
 
+// 1. Dynamic Destination Field Visibility
 if(input.Destination_Type == "Internal Office Transfer")
 {
     show Target_Office;
+    enable Target_Office;
     hide Target_Customer;
 }
 else if(input.Destination_Type == "Customer Deployment")
 {
-    hide Target_Office;
     show Target_Customer;
+    enable Target_Customer;
+    hide Target_Office;
 }
 else
 {
     hide Target_Office;
     hide Target_Customer;
+}
+
+// 2. Dynamic Deluge Filter: Exclude actively deployed devices
+pre_selected = input.Select_Devices;
+eligible_ids = Devices[Device_State != "Rentally Active" && Device_State != "Active in Demo"].ID.getAll();
+
+clear Select_Devices;
+if(eligible_ids.size() > 0)
+{
+    Select_Devices:ui.add(eligible_ids);
+}
+
+if(pre_selected != null && !pre_selected.isEmpty())
+{
+    kept_ids = list();
+    blocked_count = 0;
+    for each dev_id in pre_selected
+    {
+        if(eligible_ids.contains(dev_id))
+        {
+            kept_ids.add(dev_id);
+        }
+        else
+        {
+            blocked_count = blocked_count + 1;
+        }
+    }
+    input.Select_Devices = kept_ids;
+    if(blocked_count > 0)
+    {
+        alert "Active Deployment Exclusion:\n\n" + blocked_count + " selected device(s) are currently Rentally Active or Active in Demo. Please use Close Deployments or Swap Devices instead.";
+    }
 }

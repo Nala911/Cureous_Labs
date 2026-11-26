@@ -4,11 +4,10 @@
 // Trigger Hook : Field Actions -> Collected -> On User Input
 // File Path    : scripts/07_deployments/stateless_swap_devices/2_4_Swap_Devices_onuserinput_collected.deluge
 // Fields Used  : [Collected, Return_Office]
-// Cross-Forms  : []
-// Purpose      : Dynamically shows Return_Office when Collected? is checked,
-//                or hides and clears Return_Office when unchecked. Condition
-//                remains visible regardless of Collected? state.
-// Optimization : Pure UI event. Zero database queries.
+// Cross-Forms  : None
+// Purpose      : Dynamically shows and enables Return_Office when Collected? is
+//                checked, or hides and clears Return_Office when unchecked.
+// Optimization : Zero database queries. Runs in <1ms.
 // ==============================================================================
 
 if(input.Collected == true)

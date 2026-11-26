@@ -144,3 +144,11 @@ if(input.Device_State == null || input.Device_State == "")
 {
     input.Device_State = "Available in Stock";
 }
+else if(input.ID != null)
+{
+    if((input.Device_State == "Rentally Active" || input.Device_State == "Active in Demo") && input.Device_Stage != "6 - Ready Condition")
+    {
+        alert "Active Deployment Lock:\n\nDevice '" + input.Serial_Number + "' is currently '" + input.Device_State + "' and must stay at '6 - Ready Condition'. Use Close Deployments or Swap Devices before changing its stage.";
+        cancel submit;
+    }
+}

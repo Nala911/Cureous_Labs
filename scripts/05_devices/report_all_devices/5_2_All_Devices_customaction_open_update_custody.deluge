@@ -3,18 +3,42 @@
 // Script Type  : Report Custom Action Function (Workflow Action Item)
 // Trigger Hook : Report Actions -> For Multiple Records -> Update Custody
 // File Path    : scripts/05_devices/report_all_devices/5_2_All_Devices_customaction_open_update_custody.deluge
-// Fields Used  : [ID]
+// Fields Used  : [ID, Device_State]
 // Cross-Forms  : [Update_Device_Custody]
-// Purpose      : Captures selected record IDs from All_Devices report and launches
-//                the Update_Device_Custody stateless form modal with pre-selected devices.
-// Optimization : Single client-side redirect. Zero statement/query cost.
+// Purpose      : Validates that none of the selected rows are actively deployed
+//                (Rentally Active / Active in Demo) and launches Update_Device_Custody
+//                in a popup modal with Select_Devices pre-filled.
+// Optimization : Reads directly from selected report collection. Zero extra query.
 // ==============================================================================
 
 void open_update_custody(Devices selected_devices)
 {
-    // 1. Extract all selected record IDs into a list
-    id_list = selected_devices.ID.getAll();
+    // 1. Validate no actively deployed devices are selected
+    id_list = list();
+    blocked_count = 0;
+    for each dev in selected_devices
+    {
+        if(dev.Device_State == "Rentally Active" || dev.Device_State == "Active in Demo")
+        {
+            blocked_count = blocked_count + 1;
+        }
+        else
+        {
+            id_list.add(dev.ID);
+        }
+    }
     
-    // 2. Open the stateless form in a popup modal with the devices pre-filled
-    openUrl("#Form:Update_Device_Custody?Select_Devices=" + id_list, "popup window", "height=600px,width=700px");
+    // 2. Block if any active deployment device is included, otherwise open modal
+    if(id_list.size() == 0)
+    {
+        alert "Please select at least one device to transfer custody.";
+    }
+    else if(blocked_count > 0)
+    {
+        alert "Update Custody Blocked:\n\n" + blocked_count + " selected device(s) are currently Rentally Active or Active in Demo. Please use Close Deployments or Swap Devices to manage deployed equipment custody.";
+    }
+    else
+    {
+        openUrl("#Form:Update_Device_Custody?Select_Devices=" + id_list, "popup window", "height=600px,width=700px");
+    }
 }

@@ -5,8 +5,9 @@
 // File Path    : scripts/03_offices/1_Offices_onload.deluge
 // Fields Used  : [Office_Name]
 // Cross-Forms  : None
-// Purpose      : Ensures Office_Name is visible and enabled for intake and editing.
-// Optimization : Zero queries consumed. Instant load.
+// Purpose      : Ensures Office_Name is visible and enabled in both Add and Edit
+//                modes cleanly via Deluge rather than native Form Rules.
+// Optimization : Zero database queries. Runs in <1ms.
 // ==============================================================================
 
 show Office_Name;

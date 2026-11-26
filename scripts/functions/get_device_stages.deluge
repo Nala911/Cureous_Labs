@@ -1,0 +1,40 @@
+// ==============================================================================
+// Module Name  : Devices (Shared Utility Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Devices On Load and Update_Device_Stage On Load
+// File Path    : scripts/functions/get_device_stages.deluge
+// Fields Used  : None
+// Cross-Forms  : [Devices, Update_Device_Stage]
+// Purpose      : Central single source of truth for Device_Stage dropdown options.
+//                Pass "Control Unit" for CU stages, "Overlay" for OV stages, or
+//                "All" (or empty/null) for all 12 unified lifecycle choices.
+// Optimization : Pure in-memory list construction. Zero database queries.
+// ==============================================================================
+
+list get_device_stages(string device_type)
+{
+    stages = list();
+    stages.add("0 - Mfg Not Yet Started");
+    
+    if(device_type == "Control Unit" || device_type == "All" || device_type == null || device_type == "")
+    {
+        stages.add("1 - CU Enclosure Mfg in Progress");
+        stages.add("2 - CU Subsystems Assembled");
+    }
+    
+    if(device_type == "Overlay" || device_type == "All" || device_type == null || device_type == "")
+    {
+        stages.add("1 - OV in Screen Printing / Welding");
+        stages.add("2 - OV in Stitching");
+    }
+    
+    stages.add("3 - Yet to Assemble");
+    stages.add("4 - Assembly in Progress");
+    stages.add("5 - Assembly Completed & Not Tested");
+    stages.add("6 - Ready Condition");
+    stages.add("Retesting Needed");
+    stages.add("Repair Needed");
+    stages.add("Disinfection Needed");
+    
+    return stages;
+}

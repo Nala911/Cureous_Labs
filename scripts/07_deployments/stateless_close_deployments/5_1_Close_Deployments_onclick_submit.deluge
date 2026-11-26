@@ -3,11 +3,11 @@
 // Script Type  : Stateless Form Action (On Click of Submit)
 // Trigger Hook : Form Actions -> Submit Button -> On Click
 // File Path    : scripts/07_deployments/stateless_close_deployments/5_1_Close_Deployments_onclick_submit.deluge
-// Fields Used  : [Deployments, End_Date, Collected, Return_Office, Condition]
+// Fields Used  : [Deployments, End_Date, Collected, Return_Office, Device_Condition]
 // Cross-Forms  : [Deployments, Devices]
 // Purpose      : Validates inputs, batch-closes selected active deployments with
 //                End_Date, and batch-updates linked Control Unit and Overlay
-//                assets in Devices: sets Device_Stage = Condition; when
+//                assets in Devices: sets Device_Stage = Device_Condition; when
 //                Collected? is checked sets Available in Stock, clears
 //                Current_Customer, and assigns Current_Office; when unchecked
 //                sets Idle with Customer, clears Current_Office, and keeps
@@ -29,9 +29,9 @@ else if(input.End_Date == null)
     alert "End Date is mandatory when closing deployments.";
     is_valid = false;
 }
-else if(input.Condition == null || input.Condition == "")
+else if(input.Device_Condition == null || input.Device_Condition == "")
 {
-    alert "Condition is mandatory when closing deployments.";
+    alert "Device Condition is mandatory when closing deployments.";
     is_valid = false;
 }
 else if(input.Collected == true && input.Return_Office == null)
@@ -104,7 +104,7 @@ if(is_valid)
                 affected_devs = Devices[ID in dev_ids];
                 is_collected = (input.Collected == true);
                 target_office = input.Return_Office;
-                target_condition = input.Condition;
+                target_condition = input.Device_Condition;
                 
                 for each dev in affected_devs
                 {

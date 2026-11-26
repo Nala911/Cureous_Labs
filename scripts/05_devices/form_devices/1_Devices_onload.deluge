@@ -85,38 +85,15 @@ else
     // Clear all static choices so this device only displays its hardware-specific stages
     clear Device_Stage;
     
-    if(dev_type == "Control Unit")
+    if(dev_type == "Control Unit" || dev_type == "Overlay")
     {
-        cu_stages = list();
-        cu_stages.add("0 - Mfg Not Yet Started");
-        cu_stages.add("1 - CU Enclosure Mfg in Progress");
-        cu_stages.add("2 - CU Subsystems Assembled");
-        cu_stages.add("3 - Yet to Assemble");
-        cu_stages.add("4 - Assembly in Progress");
-        cu_stages.add("5 - Assembly Completed & Not Tested");
-        cu_stages.add("6 - Ready Condition");
-        cu_stages.add("Retesting Needed");
-        cu_stages.add("Repair Needed");
-        cu_stages.add("Disinfection Needed");
-        
-        Device_Stage:ui.add(cu_stages);
+        filtered_stages = thisapp.get_device_stages(dev_type);
     }
-    else if(dev_type == "Overlay")
+    else
     {
-        ov_stages = list();
-        ov_stages.add("0 - Mfg Not Yet Started");
-        ov_stages.add("1 - OV in Screen Printing / Welding");
-        ov_stages.add("2 - OV in Stitching");
-        ov_stages.add("3 - Yet to Assemble");
-        ov_stages.add("4 - Assembly in Progress");
-        ov_stages.add("5 - Assembly Completed & Not Tested");
-        ov_stages.add("6 - Ready Condition");
-        ov_stages.add("Retesting Needed");
-        ov_stages.add("Repair Needed");
-        ov_stages.add("Disinfection Needed");
-        
-        Device_Stage:ui.add(ov_stages);
+        filtered_stages = thisapp.get_device_stages("All");
     }
+    Device_Stage:ui.add(filtered_stages);
     
     // Re-assert current stage so selection is preserved
     if(current_stage != null && current_stage != "")
@@ -124,7 +101,15 @@ else
         input.Device_Stage = current_stage;
     }
     
-    // Technicians can update Device Stage through manufacturing and maintenance
+    // Technicians can update Device Stage through manufacturing and maintenance,
+    // except while the device is actively deployed at a customer bedside.
     show Device_Stage;
-    enable Device_Stage;
+    if(input.Device_State == "Rentally Active" || input.Device_State == "Active in Demo")
+    {
+        disable Device_Stage;
+    }
+    else
+    {
+        enable Device_Stage;
+    }
 }

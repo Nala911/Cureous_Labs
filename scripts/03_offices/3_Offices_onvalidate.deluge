@@ -5,11 +5,11 @@
 // File Path    : scripts/03_offices/3_Offices_onvalidate.deluge
 // Fields Used  : [Office_Name]
 // Cross-Forms  : [Offices]
-// Purpose      : Enforces mandatory entry and uniqueness for Office_Name.
-// Optimization : Single indexed query for duplicate check. Runs in <5ms.
+// Purpose      : Enforces mandatory Office_Name, trims extra whitespace, and
+//                prevents duplicate branch office names across Offices.
+// Optimization : Single indexed lookup against Offices. Zero loop queries.
 // ==============================================================================
 
-// 1. Mandatory Check: Office Name
 if(input.Office_Name == null || input.Office_Name.trim() == "")
 {
     alert "Mandatory Field Missing:\n\nPlease enter an Office Name.";
@@ -19,17 +19,15 @@ if(input.Office_Name == null || input.Office_Name.trim() == "")
 clean_name = input.Office_Name.trim();
 input.Office_Name = clean_name;
 
-// 2. Duplicate Guard: Ensure Office Name is unique
 curr_id = 0;
 if(input.ID != null)
 {
     curr_id = input.ID;
 }
 
-target_name = clean_name;
-existing_offices = Offices[Office_Name == target_name && ID != curr_id];
-if(existing_offices.count() > 0)
+dup_offices = Offices[Office_Name == clean_name && ID != curr_id];
+if(dup_offices.count() > 0)
 {
-    alert "Duplicate Office Name:\n\nOffice '" + clean_name + "' already exists in the system.\n\nPlease enter a unique office name.";
+    alert "Duplicate Office Name:\n\nOffice '" + clean_name + "' already exists in the registry.";
     cancel submit;
 }

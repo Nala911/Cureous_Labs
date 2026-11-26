@@ -3,19 +3,33 @@
 // Script Type  : Report Custom Action Function (Namespace: deployments_actions)
 // Trigger Hook : Report Actions -> For Multiple Records -> Close Deployments
 // File Path    : scripts/07_deployments/report_all_deployments/5_1_All_Deployments_customaction_open_close_deployments.deluge
-// Fields Used  : [ID]
+// Fields Used  : [ID, Deployment_State]
 // Cross-Forms  : [Close_Deployments]
-// Purpose      : Captures selected record IDs from All_Deployments report and
-//                launches the Close_Deployments stateless form modal with the
-//                Deployments multi-select lookup pre-filled.
-// Optimization : Single client-side redirect. Zero statement/query cost.
+// Purpose      : Filters selected All_Deployments rows to active deployments
+//                (Deployment_State != "Closed"), blocks if none are active, and
+//                launches Close_Deployments with only active IDs pre-filled.
+// Optimization : Reads directly from selected report collection. Zero extra query.
 // ==============================================================================
 
 void open_close_deployments(Deployments selected_deployments)
 {
-    // 1. Extract all selected record IDs into a list
-    id_list = selected_deployments.ID.getAll();
+    // 1. Keep only non-closed deployments from the selection
+    active_ids = list();
+    for each dep in selected_deployments
+    {
+        if(dep.Deployment_State != "Closed")
+        {
+            active_ids.add(dep.ID);
+        }
+    }
     
-    // 2. Open the stateless form in a popup modal with deployments pre-filled
-    openUrl("#Form:Close_Deployments?Deployments=" + id_list, "popup window", "height=600px,width=700px");
+    // 2. Guard against closing when zero active rows are selected
+    if(active_ids.size() == 0)
+    {
+        alert "Close Blocked: No active deployments selected. All selected deployment(s) are already Closed.";
+    }
+    else
+    {
+        openUrl("#Form:Close_Deployments?Deployments=" + active_ids, "popup window", "height=600px,width=700px");
+    }
 }

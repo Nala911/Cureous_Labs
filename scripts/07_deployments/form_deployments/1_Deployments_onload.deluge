@@ -3,7 +3,7 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/07_deployments/form_deployments/1_Deployments_onload.deluge
-// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay, Deployment_State]
+// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay, Deployment_State, Deployment_Summary]
 // Cross-Forms  : [Devices]
 // Purpose      : Initializes default values in Add mode (Start_Date to today,
 //                Deployment_State choices restricted to Rental/Demo with Rental
@@ -31,6 +31,7 @@ if(input.ID == null)
     show Deployment_State;
     
     hide End_Date;
+    hide Deployment_Summary;
     
     // Auto-populate Start Date with today's date if empty
     if(input.Start_Date == null)
@@ -67,6 +68,7 @@ if(input.ID == null)
 }
 else
 {
+    hide Deployment_Summary;
     // 2. EDIT Mode: Audit lock if deployment is already closed
     if(input.Deployment_State == "Closed")
     {
@@ -80,7 +82,9 @@ else
     }
     else
     {
-        enable Customer;
+        // Active Edit Mode: lock Customer, Control_Unit, and Overlay so identity
+        // changes and hardware swaps follow Close_Deployments / Swap_Devices.
+        disable Customer;
         disable Control_Unit;
         disable Overlay;
         enable Start_Date;
@@ -94,6 +98,7 @@ else
         else
         {
             hide End_Date;
+    hide Deployment_Summary;
         }
         
         // Expose active lifecycle choices in Edit mode (closures flow through Close_Deployments)

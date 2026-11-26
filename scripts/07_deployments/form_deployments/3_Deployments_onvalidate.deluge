@@ -3,8 +3,8 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/07_deployments/form_deployments/3_Deployments_onvalidate.deluge
-// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, Deployment_State]
-// Cross-Forms  : [Deployments, Devices]
+// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, Deployment_State, Deployment_Summary]
+// Cross-Forms  : [Deployments, Devices, Customers]
 // Purpose      : Enforces mandatory fields, validates dates, ensures at least
 //                one physical device is selected, checks hardware types, and
 //                prevents double-booking an active Control Unit or Overlay.
@@ -51,6 +51,8 @@ if(input.Deployment_State == "Closed" && input.End_Date == null)
 }
 
 // 4. Hardware Type Verification & Add-Mode Readiness Parity
+cu_dev = null;
+ov_dev = null;
 if(input.Control_Unit != null)
 {
     target_cu = input.Control_Unit;
@@ -138,3 +140,40 @@ if(input.Deployment_State != "Closed")
         }
     }
 }
+
+// 6. Populate Compact Human-Readable Deployment Summary
+target_cust_id = input.Customer;
+cust_rec = Customers[ID == target_cust_id];
+short_cust = "";
+if(cust_rec != null && cust_rec.Customer_Name != null)
+{
+    raw_words = cust_rec.Customer_Name.trim().toList(" ");
+    clean_words = list();
+    for each w in raw_words
+    {
+        w_trim = w.trim();
+        if(w_trim != "" && clean_words.size() < 2)
+        {
+            clean_words.add(w_trim);
+        }
+    }
+    if(clean_words.size() >= 2)
+    {
+        short_cust = clean_words.get(0) + " " + clean_words.get(1);
+    }
+    else if(clean_words.size() == 1)
+    {
+        short_cust = clean_words.get(0);
+    }
+}
+
+summary_str = short_cust;
+if(cu_dev != null && cu_dev.Serial_Number != null)
+{
+    summary_str = summary_str + " | " + cu_dev.Serial_Number;
+}
+if(ov_dev != null && ov_dev.Serial_Number != null)
+{
+    summary_str = summary_str + " | " + ov_dev.Serial_Number;
+}
+input.Deployment_Summary = summary_str;

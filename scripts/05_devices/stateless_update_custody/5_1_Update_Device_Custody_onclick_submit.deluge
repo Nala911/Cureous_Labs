@@ -4,14 +4,12 @@
 // Trigger Hook : Form Actions -> Submit Button -> On Click
 // File Path    : scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge
 // Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
-// Cross-Forms  : [Devices]
-// Purpose      : Validates selected devices and destination details. Fetches records
-//                in a single batch query. For office transfers, sets Current_Office,
-//                unassigns Current_Customer, and marks Device_State as 'Available in Stock'.
-//                For customer deployments, sets Current_Customer, clears Current_Office,
-//                and marks Device_State as 'Rentally Active'. Redirects cleanly to report.
-// Optimization : Single batch fetch [ID in dev_ids] prevents statement exhaustion.
-//                Safe and efficient for 100+ units in a single operation.
+// Cross-Forms  : [Devices, Deployments]
+// Purpose      : Validates selected devices (blocking Rentally Active / Active
+//                in Demo / open Deployments, and enforcing 6 - Ready Condition
+//                on Customer Deployment) and batch-updates custody & state.
+// Optimization : Two batch queries ([ID in dev_ids] and open Deployments check)
+//                prevent statement exhaustion even on 100+ selected devices.
 // ==============================================================================
 
 // 1. Mandatory Input Validation
@@ -50,35 +48,93 @@ if(is_valid)
     }
     else
     {
-        // 3. Batch Custody & State Synchronization
+        // 3. Active Deployment & Readiness Safety Pre-Check
         dest_type = input.Destination_Type;
-        updated_count = 0;
+        active_blocked = "";
+        not_ready_blocked = "";
         
-        if(dest_type == "Internal Office Transfer")
+        open_deps = Deployments[(Control_Unit in dev_ids || Overlay in dev_ids) && Deployment_State != "Closed"];
+        open_dep_dev_ids = list();
+        for each dep in open_deps
         {
-            office_id = input.Target_Office;
-            for each dev in selected_devs
+            if(dep.Control_Unit != null)
             {
-                dev.Current_Office = office_id;
-                dev.Current_Customer = null;
-                dev.Device_State = "Available in Stock";
-                updated_count = updated_count + 1;
+                dep_cu = dep.Control_Unit;
+                if(!open_dep_dev_ids.contains(dep_cu))
+                {
+                    open_dep_dev_ids.add(dep_cu);
+                }
+            }
+            if(dep.Overlay != null)
+            {
+                dep_ov = dep.Overlay;
+                if(!open_dep_dev_ids.contains(dep_ov))
+                {
+                    open_dep_dev_ids.add(dep_ov);
+                }
             }
         }
-        else if(dest_type == "Customer Deployment")
+        
+        for each dev_check in selected_devs
         {
-            cust_id = input.Target_Customer;
-            for each dev in selected_devs
+            chk_id = dev_check.ID;
+            if(dev_check.Device_State == "Rentally Active" || dev_check.Device_State == "Active in Demo" || open_dep_dev_ids.contains(chk_id))
             {
-                dev.Current_Customer = cust_id;
-                dev.Current_Office = null;
-                dev.Device_State = "Rentally Active";
-                updated_count = updated_count + 1;
+                if(active_blocked != "")
+                {
+                    active_blocked = active_blocked + ", ";
+                }
+                active_blocked = active_blocked + dev_check.Serial_Number;
+            }
+            else if(dest_type == "Customer Deployment" && dev_check.Device_Stage != "6 - Ready Condition")
+            {
+                if(not_ready_blocked != "")
+                {
+                    not_ready_blocked = not_ready_blocked + ", ";
+                }
+                not_ready_blocked = not_ready_blocked + dev_check.Serial_Number;
             }
         }
         
-        // 4. User Feedback & View Refresh
-        alert "Successfully updated custody for " + updated_count + " device(s).";
-        openUrl("#Report:All_Devices", "same window");
+        if(active_blocked != "")
+        {
+            alert "Update Custody Blocked:\n\nDevice(s) currently linked to an active deployment: " + active_blocked + ".\nPlease use Close Deployments or Swap Devices first.";
+        }
+        else if(not_ready_blocked != "")
+        {
+            alert "Customer Deployment Blocked:\n\nDevice(s) not at '6 - Ready Condition': " + not_ready_blocked + ".";
+        }
+        else
+        {
+            // 4. Batch Custody & State Synchronization
+            updated_count = 0;
+            
+            if(dest_type == "Internal Office Transfer")
+            {
+                office_id = input.Target_Office;
+                for each dev in selected_devs
+                {
+                    dev.Current_Office = office_id;
+                    dev.Current_Customer = null;
+                    dev.Device_State = "Available in Stock";
+                    updated_count = updated_count + 1;
+                }
+            }
+            else if(dest_type == "Customer Deployment")
+            {
+                cust_id = input.Target_Customer;
+                for each dev in selected_devs
+                {
+                    dev.Current_Customer = cust_id;
+                    dev.Current_Office = null;
+                    dev.Device_State = "Rentally Active";
+                    updated_count = updated_count + 1;
+                }
+            }
+            
+            // 5. User Feedback & View Refresh
+            alert "Successfully updated custody for " + updated_count + " device(s).";
+            openUrl("#Report:All_Devices", "same window");
+        }
     }
 }

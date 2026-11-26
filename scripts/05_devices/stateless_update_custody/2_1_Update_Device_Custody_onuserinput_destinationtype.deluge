@@ -1,27 +1,27 @@
 // ==============================================================================
 // Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
-// Script Type  : Field Action Workflow (On User Input)
+// Script Type  : Stateless Form Workflow (On User Input)
 // Trigger Hook : Field Actions -> Destination_Type -> On User Input
 // File Path    : scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge
 // Fields Used  : [Destination_Type, Target_Office, Target_Customer]
 // Cross-Forms  : None
-// Purpose      : Dynamically toggles field visibility based on chosen destination.
-//                If Internal Office Transfer is chosen, displays Target_Office and
-//                clears Target_Customer. If Customer Deployment is chosen, displays
-//                Target_Customer and clears Target_Office.
-// Optimization : Pure UI toggle. Zero database queries. Runs in <1ms.
+// Purpose      : Toggles Target_Office vs Target_Customer visibility and clears
+//                the hidden destination field cleanly via Deluge.
+// Optimization : Zero database queries. Runs in <1ms.
 // ==============================================================================
 
 if(input.Destination_Type == "Internal Office Transfer")
 {
     show Target_Office;
+    enable Target_Office;
     hide Target_Customer;
     input.Target_Customer = null;
 }
 else if(input.Destination_Type == "Customer Deployment")
 {
-    hide Target_Office;
     show Target_Customer;
+    enable Target_Customer;
+    hide Target_Office;
     input.Target_Office = null;
 }
 else

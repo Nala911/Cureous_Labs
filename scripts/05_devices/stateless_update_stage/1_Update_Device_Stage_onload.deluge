@@ -4,15 +4,46 @@
 // Trigger Hook : Form Actions -> On Load
 // File Path    : scripts/05_devices/stateless_update_stage/1_Update_Device_Stage_onload.deluge
 // Fields Used  : [Select_Devices, New_Device_Stage]
-// Cross-Forms  : None
-// Purpose      : Initializes the stateless stage update form. If opened as a
-//                pop-up modal from a Report Custom Action, retains prefilled devices.
-//                Ensures interactive fields are clean and ready for user selection.
-// Optimization : Pure UI initialization. Zero database queries.
+// Cross-Forms  : [Devices]
+// Purpose      : Dynamically filters Select_Devices via Deluge to exclude
+//                actively deployed devices (Rentally Active / Active in Demo)
+//                while preserving any eligible pre-filled URL IDs, and populates
+//                New_Device_Stage choices from the shared get_device_stages function.
+// Optimization : Single indexed list query on Devices. Runs in <10ms.
 // ==============================================================================
 
-// 1. Maintain interactive state for device multi-select and target stage
-if(input.Select_Devices != null)
+pre_selected = input.Select_Devices;
+eligible_ids = Devices[Device_State != "Rentally Active" && Device_State != "Active in Demo"].ID.getAll();
+
+clear Select_Devices;
+if(eligible_ids.size() > 0)
 {
-    // Records already prefilled via report action or URL parameter
+    Select_Devices:ui.add(eligible_ids);
 }
+
+if(pre_selected != null && !pre_selected.isEmpty())
+{
+    kept_ids = list();
+    blocked_count = 0;
+    for each dev_id in pre_selected
+    {
+        if(eligible_ids.contains(dev_id))
+        {
+            kept_ids.add(dev_id);
+        }
+        else
+        {
+            blocked_count = blocked_count + 1;
+        }
+    }
+    input.Select_Devices = kept_ids;
+    if(blocked_count > 0)
+    {
+        alert "Active Deployment Exclusion:\n\n" + blocked_count + " selected device(s) are currently Rentally Active or Active in Demo and cannot change stage here. Use Close Deployments or Swap Devices first.";
+    }
+}
+
+// Populate New_Device_Stage choices from shared single source of truth
+clear New_Device_Stage;
+all_stages = thisapp.get_device_stages("All");
+New_Device_Stage:ui.add(all_stages);
