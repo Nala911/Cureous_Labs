@@ -1,0 +1,16 @@
+// ==============================================================================
+// Module Name  : Update Device Custody (Form Link Name: Update_Device_Custody)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Target_Customer -> On User Input
+// File Path    : scripts/05_devices/stateless_update_custody/2_2_Update_Device_Custody_onuserinput_target_customer.deluge
+// Fields Used  : [Target_Customer, Target_Office]
+// Cross-Forms  : None
+// Purpose      : Auto-clears Target_Office when Target_Customer is selected so
+//                both destination lookups can stay visible without conflict.
+// Optimization : Zero database queries. Runs in <1ms.
+// ==============================================================================
+
+if(input.Target_Customer != null)
+{
+    input.Target_Office = null;
+}

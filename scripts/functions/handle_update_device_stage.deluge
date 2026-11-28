@@ -1,0 +1,108 @@
+// ==============================================================================
+// Module Name  : Update Device Stage (Action Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Update_Device_Stage -> Submit -> On Click
+// File Path    : scripts/functions/handle_update_device_stage.deluge
+// Fields Used  : [Select_Devices, New_Device_Stage]
+// Cross-Forms  : [Devices]
+// Purpose      : Validates selected devices and target stage, blocks active
+//                deployed units, harmonizes hardware-specific Stages 1 and 2,
+//                and batch-updates Devices.Device_Stage inside try-catch.
+// Optimization : Single batch fetch [ID in select_devices] prevents loop queries.
+// ==============================================================================
+
+string handle_update_device_stage(list select_devices, string new_device_stage)
+{
+    err_msg = "";
+    try
+    {
+        if(select_devices == null || select_devices.isEmpty())
+        {
+            err_msg = "Please select at least one device to update.";
+        }
+        else if(new_device_stage == null || new_device_stage == "")
+        {
+            err_msg = "Please select the target stage in 'New Device Stage'.";
+        }
+        else
+        {
+            selected_devs = Devices[ID in select_devices];
+            if(selected_devs.count() == 0)
+            {
+                err_msg = "No matching device records found for the selected IDs.";
+            }
+            else
+            {
+                active_blocked = "";
+                for each dev_check in selected_devs
+                {
+                    if(dev_check.Device_State == "Rentally Active" || dev_check.Device_State == "Active in Demo")
+                    {
+                        if(active_blocked != "")
+                        {
+                            active_blocked = active_blocked + ", ";
+                        }
+                        active_blocked = active_blocked + dev_check.Serial_Number;
+                    }
+                }
+                
+                if(active_blocked != "")
+                {
+                    err_msg = "Update Stage Blocked:\n\nActive deployed device(s) cannot change stage here: " + active_blocked + ".\nPlease use Close Deployments or Swap Devices first.";
+                }
+                else
+                {
+                    for each dev in selected_devs
+                    {
+                        d_type = dev.Device_Type;
+                        target_stg = new_device_stage;
+                        
+                        if(d_type == null || d_type == "")
+                        {
+                            sn = dev.Serial_Number;
+                            if(sn != null && sn.contains("CU"))
+                            {
+                                d_type = "Control Unit";
+                            }
+                            else if(sn != null && sn.contains("OV"))
+                            {
+                                d_type = "Overlay";
+                            }
+                        }
+                        
+                        if(d_type == "Overlay")
+                        {
+                            if(new_device_stage == "1 - CU Enclosure Mfg in Progress")
+                            {
+                                target_stg = "1 - OV in Screen Printing / Welding";
+                            }
+                            else if(new_device_stage == "2 - CU Subsystems Assembled")
+                            {
+                                target_stg = "2 - OV in Stitching";
+                            }
+                        }
+                        else if(d_type == "Control Unit")
+                        {
+                            if(new_device_stage == "1 - OV in Screen Printing / Welding")
+                            {
+                                target_stg = "1 - CU Enclosure Mfg in Progress";
+                            }
+                            else if(new_device_stage == "2 - OV in Stitching")
+                            {
+                                target_stg = "2 - CU Subsystems Assembled";
+                            }
+                        }
+                        
+                        dev.Device_Stage = target_stg;
+                    }
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        ctx = "Select_Devices=" + select_devices + " | New_Device_Stage=" + new_device_stage;
+        err_msg = thisapp.format_error_log("handle_update_device_stage", "scripts/functions/handle_update_device_stage.deluge", "Update_Device_Stage -> Submit -> On Click", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+    }
+    return err_msg;
+}

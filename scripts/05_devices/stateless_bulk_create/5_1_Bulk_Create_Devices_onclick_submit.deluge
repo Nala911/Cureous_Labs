@@ -1,0 +1,23 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Form Link Name: Bulk_Create_Devices)
+// Script Type  : Stateless Form Action (On Click of Submit)
+// Trigger Hook : Form Actions -> Submit Button -> On Click
+// File Path    : scripts/05_devices/stateless_bulk_create/5_1_Bulk_Create_Devices_onclick_submit.deluge
+// Fields Used  : [Device_Rows, Serial_Numbers]
+// Cross-Forms  : [Devices, Lots, Product_Models, Offices]
+// Purpose      : Thin UI wrapper calling handle_bulk_create_devices. Validates
+//                every row in Device_Rows (or falls back to Serial_Numbers),
+//                alerts exact row/field fixes needed on any error, or redirects
+//                cleanly to All_Devices on success.
+// Optimization : Delegates batch validation and atomic insertion to handler.
+// ==============================================================================
+
+err = thisapp.handle_bulk_create_devices(input.Device_Rows, input.Serial_Numbers);
+if(err != "")
+{
+    alert err;
+}
+else
+{
+    openUrl("#Report:All_Devices", "same window");
+}

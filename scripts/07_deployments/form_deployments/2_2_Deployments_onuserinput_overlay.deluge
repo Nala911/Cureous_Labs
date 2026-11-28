@@ -3,11 +3,12 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Overlay -> On User Input
 // File Path    : scripts/07_deployments/form_deployments/2_2_Deployments_onuserinput_overlay.deluge
-// Fields Used  : [Overlay]
+// Fields Used  : [Customer, Overlay]
 // Cross-Forms  : [Devices]
 // Purpose      : Validates selected hardware is an Overlay mattress. In Add mode,
-//                verifies the mattress is in "6 - Ready Condition" and "Available in Stock".
-//                Alerts and clears field if mismatched or ineligible.
+//                verifies the mattress is in "6 - Ready Condition" and either
+//                "Available in Stock" or "Idle with Customer" (auto-filling or
+//                matching Customer custody). Alerts and clears if invalid.
 // Optimization : Single indexed PK lookup by ID. Executes in <10ms.
 // ==============================================================================
 
@@ -27,7 +28,7 @@ if(input.Overlay != null)
         }
         else
         {
-            // 2. In Add mode, enforce readiness & availability gate
+            // 2. In Add mode, enforce readiness, availability & custody gate
             if(input.ID == null)
             {
                 if(ov_dev.Device_Stage != "6 - Ready Condition")
@@ -35,10 +36,24 @@ if(input.Overlay != null)
                     alert "Not Ready for Deployment: Overlay " + ov_dev.Serial_Number + " is currently at stage '" + ov_dev.Device_Stage + "' (requires '6 - Ready Condition').";
                     input.Overlay = null;
                 }
-                else if(ov_dev.Device_State != "Available in Stock")
+                else if(ov_dev.Device_State != "Available in Stock" && ov_dev.Device_State != "Idle with Customer")
                 {
-                    alert "Device Unavailable: Overlay " + ov_dev.Serial_Number + " is currently '" + ov_dev.Device_State + "' (requires 'Available in Stock').";
+                    alert "Device Unavailable: Overlay " + ov_dev.Serial_Number + " is currently '" + ov_dev.Device_State + "' (requires 'Available in Stock' or 'Idle with Customer').";
                     input.Overlay = null;
+                }
+                else if(ov_dev.Device_State == "Idle with Customer" && ov_dev.Current_Customer != null)
+                {
+                    sel_cust = input.Customer;
+                    dev_cust = ov_dev.Current_Customer;
+                    if(sel_cust == null)
+                    {
+                        input.Customer = dev_cust;
+                    }
+                    else if(dev_cust != sel_cust)
+                    {
+                        alert "Custody Mismatch: Overlay " + ov_dev.Serial_Number + " is currently 'Idle with Customer' at a different customer site. Select the matching customer or transfer custody first.";
+                        input.Overlay = null;
+                    }
                 }
             }
         }

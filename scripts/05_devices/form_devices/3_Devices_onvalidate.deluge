@@ -42,49 +42,29 @@ if(existing_dev.count() > 0)
     cancel submit;
 }
 
-// 3. Validate Serial Syntax & Derive Safety Fallbacks
-is_cu = clean_sn.contains("CU");
-is_ov = clean_sn.contains("OV");
-
-if(!is_cu && !is_ov)
+// 3. Validate Serial Syntax & Derive Safety Fallbacks via shared parse_device_serial
+p_res = thisapp.parse_device_serial(clean_sn);
+if(p_res.get("_error") != null && p_res.get("_error") != "")
 {
-    alert "Invalid Serial Number Format:\n\nSerial Number must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+    alert p_res.get("_error").toString();
     cancel submit;
 }
-
-is_valid_prefix = clean_sn.startsWith("ALT") || clean_sn.startsWith("ET");
-if(!is_valid_prefix)
+if(p_res.get("is_valid") != "true")
 {
-    alert "Invalid Model Prefix:\n\nSerial Number must begin with recognized prefix: 'ALT' (Altern4) or 'ET' (Eturnal).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+    alert "Invalid Serial Number Format:\n\n" + p_res.get("error").toString() + "\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
     cancel submit;
 }
 
 // Safety Fallback for Device Type
 if(input.Device_Type == null || input.Device_Type == "")
 {
-    if(is_cu)
-    {
-        input.Device_Type = "Control Unit";
-    }
-    else if(is_ov)
-    {
-        input.Device_Type = "Overlay";
-    }
+    input.Device_Type = p_res.get("device_type").toString();
 }
 
 // Safety Fallback for Product Model Lookup
 if(input.Product_Model == null)
 {
-    target_name = "";
-    if(clean_sn.startsWith("ALT"))
-    {
-        target_name = "Altern4";
-    }
-    else if(clean_sn.startsWith("ET"))
-    {
-        target_name = "Eturnal One";
-    }
-    
+    target_name = p_res.get("model_name").toString();
     if(target_name != "")
     {
         for each pm in Product_Models[Product_Model_Name == target_name]

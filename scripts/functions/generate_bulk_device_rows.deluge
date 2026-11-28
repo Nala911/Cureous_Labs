@@ -1,0 +1,118 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Row Generator & Reference Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Bulk_Create_Devices (On Load, Serial_Numbers On User Input)
+//                and handle_bulk_create_devices fallback
+// File Path    : scripts/functions/generate_bulk_device_rows.deluge
+// Fields Used  : [Lot_ID, Office_Name]
+// Cross-Forms  : [Devices, Lots, Product_Models, Offices, Bulk_Create_Devices]
+// Purpose      : Parses pasted serial numbers (newlines, spaces, commas, tabs,
+//                semicolons), auto-fills editable Device_Rows with derived
+//                Product_Model, latest Lot, Stage 0, and default 'Bangalore Office',
+//                and delegates live validation + readable Reference_Guide
+//                formatting to validate_bulk_device_rows.
+// Optimization : Single queries for default Lot & Office; delegates batch validation
+//                to validate_bulk_device_rows.
+// ==============================================================================
+
+map generate_bulk_device_rows(string raw_serials)
+{
+    result = map();
+    header_line = "Serial_Number | Product_Model | Lot | Device_Stage | Current_Office";
+    result.put("device_rows_text", header_line);
+    result.put("reference_text", "");
+    try
+    {
+        default_lot = "";
+        for each latest_lot in Lots[ID != null] sort by Added_Time desc range from 1 to 1
+        {
+            default_lot = latest_lot.Lot_ID;
+        }
+        
+        default_office = "";
+        for each def_off in Offices[Office_Name == "Bangalore Office"] range from 1 to 1
+        {
+            default_office = def_off.Office_Name;
+        }
+        
+        rows_out = header_line;
+        paste_note = "";
+        
+        if(raw_serials != null && raw_serials.trim() != "")
+        {
+            normalized = raw_serials.trim();
+            normalized = normalized.replaceAll("\r\n", ",");
+            normalized = normalized.replaceAll("\n", ",");
+            normalized = normalized.replaceAll("\r", ",");
+            normalized = normalized.replaceAll("\t", ",");
+            normalized = normalized.replaceAll(";", ",");
+            normalized = normalized.replaceAll(" ", ",");
+            tokens = normalized.toList(",");
+            
+            seen_tokens = list();
+            paste_dups = list();
+            
+            for each raw_tok in tokens
+            {
+                tok = raw_tok.trim().toUpperCase();
+                if(tok != "")
+                {
+                    if(seen_tokens.contains(tok))
+                    {
+                        if(!paste_dups.contains(tok))
+                        {
+                            paste_dups.add(tok);
+                        }
+                    }
+                    else
+                    {
+                        seen_tokens.add(tok);
+                        p_res = thisapp.parse_device_serial(tok);
+                        if(p_res.get("_error") != null && p_res.get("_error") != "")
+                        {
+                            result.put("_error", p_res.get("_error"));
+                            return result;
+                        }
+                        m_name = p_res.get("model_name").toString();
+                        rows_out = rows_out + "\n" + tok + " | " + m_name + " | " + default_lot + " | 0 - Mfg Not Yet Started | " + default_office;
+                    }
+                }
+            }
+            
+            if(paste_dups.size() > 0)
+            {
+                dup_csv = "";
+                for each d_sn in paste_dups
+                {
+                    if(dup_csv != "")
+                    {
+                        dup_csv = dup_csv + ", ";
+                    }
+                    dup_csv = dup_csv + d_sn;
+                }
+                paste_note = "  - Paste Duplicates Ignored (" + paste_dups.size() + "): " + dup_csv;
+            }
+        }
+        
+        val_res = thisapp.validate_bulk_device_rows(rows_out, paste_note);
+        if(val_res.get("_error") != null && val_res.get("_error") != "")
+        {
+            result.put("_error", val_res.get("_error"));
+            return result;
+        }
+        
+        result.put("device_rows_text", rows_out);
+        result.put("reference_text", val_res.get("reference_text").toString());
+    }
+    catch (e)
+    {
+        raw_len = 0;
+        if(raw_serials != null)
+        {
+            raw_len = raw_serials.length();
+        }
+        err_log = thisapp.format_error_log("generate_bulk_device_rows", "scripts/functions/generate_bulk_device_rows.deluge", "Row Generator Function", "" + e.lineNo, "" + e.type, "" + e.message, "raw_length=" + raw_len);
+        result.put("_error", err_log);
+    }
+    return result;
+}

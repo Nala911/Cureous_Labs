@@ -1,0 +1,57 @@
+// ==============================================================================
+// Module Name  : Deployments (Shared Utility Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Mark_Deployments_Billed On Click of Submit
+// File Path    : scripts/functions/advance_billing_period.deluge
+// Fields Used  : None
+// Cross-Forms  : [Deployments, Mark_Deployments_Billed]
+// Purpose      : Advances an active Rental deployment to its subsequent billing
+//                cycle: next day after current_to for Pay Per Use, or next month
+//                anchored to anchor_day (clamped to month length) for Fixed Monthly.
+// Optimization : Pure date math delegating cycle formatting to compute_billing_period.
+// ==============================================================================
+
+map advance_billing_period(date current_from, date current_to, string billing_mode, int anchor_day)
+{
+    result = map();
+    try
+    {
+        if(current_from == null || current_to == null || billing_mode == null || billing_mode == "")
+        {
+            return result;
+        }
+        
+        if(billing_mode == "Pay Per Use")
+        {
+            next_start = current_to.addDay(1);
+            return thisapp.compute_billing_period(next_start, "Pay Per Use", 1);
+        }
+        else if(billing_mode == "Fixed Monthly")
+        {
+            eff_anchor = anchor_day;
+            if(eff_anchor == null || eff_anchor < 1)
+            {
+                eff_anchor = current_from.getDay();
+            }
+            curr_first = current_from.subDay(current_from.getDay() - 1);
+            next_first = curr_first.addMonth(1);
+            next_last = next_first.addMonth(1).subDay(1);
+            max_day = next_last.getDay();
+            target_day = eff_anchor;
+            if(target_day > max_day)
+            {
+                target_day = max_day;
+            }
+            next_start = next_first.addDay(target_day - 1);
+            return thisapp.compute_billing_period(next_start, "Fixed Monthly", eff_anchor);
+        }
+    }
+    catch (e)
+    {
+        ctx = "current_from=" + current_from + " | current_to=" + current_to + " | billing_mode=" + billing_mode + " | anchor_day=" + anchor_day;
+        err_log = thisapp.format_error_log("advance_billing_period", "scripts/functions/advance_billing_period.deluge", "Shared Utility Function", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+        result.put("_error", err_log);
+    }
+    
+    return result;
+}

@@ -1,0 +1,46 @@
+// ==============================================================================
+// Module Name  : Deployments (Report Link Name: All_Deployments)
+// Script Type  : Report Custom Action Function (Namespace: deployments_actions)
+// Trigger Hook : Report Actions -> For Multiple Records -> Mark as Billed
+// File Path    : scripts/07_deployments/report_all_deployments/5_3_All_Deployments_customaction_open_mark_billed.deluge
+// Fields Used  : [ID, Next_Billing_From]
+// Cross-Forms  : [Mark_Deployments_Billed]
+// Purpose      : Filters selected All_Deployments rows to deployments that have
+//                an unbilled period (Next_Billing_From != null) and opens
+//                Mark_Deployments_Billed pre-filled (or unfiltered if none of
+//                the selected rows had a pending period).
+// Optimization : Reads directly from selected report collection. Zero extra query.
+// ==============================================================================
+
+void open_mark_deployments_billed(Deployments selected_deployments)
+{
+    sel_count = 0;
+    try
+    {
+        // 1. Keep only deployments with a pending billing period
+        pending_ids = list();
+        for each dep in selected_deployments
+        {
+            sel_count = sel_count + 1;
+            if(dep.Next_Billing_From != null)
+            {
+                pending_ids.add(dep.ID);
+            }
+        }
+        
+        // 2. Open Mark_Deployments_Billed (pre-filled if eligible rows exist)
+        if(pending_ids.size() == 0)
+        {
+            openUrl("#Form:Mark_Deployments_Billed", "popup window", "height=520px,width=680px");
+        }
+        else
+        {
+            openUrl("#Form:Mark_Deployments_Billed?Deployments=" + pending_ids, "popup window", "height=520px,width=680px");
+        }
+    }
+    catch (e)
+    {
+        err_log = thisapp.format_error_log("open_mark_deployments_billed", "scripts/07_deployments/report_all_deployments/5_3_All_Deployments_customaction_open_mark_billed.deluge", "All_Deployments -> Mark as Billed", "" + e.lineNo, "" + e.type, "" + e.message, "selected_count=" + sel_count);
+        alert err_log;
+    }
+}

@@ -1,0 +1,135 @@
+// ==============================================================================
+// Module Name  : Mark Deployments Billed (Action Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Mark_Deployments_Billed -> Submit -> On Click
+// File Path    : scripts/functions/handle_mark_deployments_billed.deluge
+// Fields Used  : [Deployments, Billing_Action]
+// Cross-Forms  : [Deployments]
+// Purpose      : Validates billing eligibility across selected deployments and
+//                batch-advances or clears billing periods inside try-catch.
+// Optimization : Single batch fetch [ID in deployment_ids] prevents loop queries.
+// ==============================================================================
+
+string handle_mark_deployments_billed(list deployment_ids, string billing_action)
+{
+    err_msg = "";
+    try
+    {
+        if(deployment_ids == null || deployment_ids.isEmpty())
+        {
+            err_msg = "Please select at least one deployment with a pending billing period.";
+        }
+        else if(billing_action == null || billing_action == "")
+        {
+            err_msg = "Please select a Billing Action.";
+        }
+        else
+        {
+            selected_deps = Deployments[ID in deployment_ids];
+            if(selected_deps.count() == 0)
+            {
+                err_msg = "No matching deployment records found for the selected IDs.";
+            }
+            else
+            {
+                precheck_ok = true;
+                is_no_usage = (billing_action == "No Usage (Skip Pay Per Use Period)");
+                
+                for each dep in selected_deps
+                {
+                    if(precheck_ok)
+                    {
+                        if(dep.Next_Billing_From == null || dep.Next_Billing_To == null)
+                        {
+                            err_msg = "Action Blocked: One or more selected deployments have no pending billing period.";
+                            precheck_ok = false;
+                        }
+                        else if(is_no_usage && dep.Billing_Mode == "Fixed Monthly")
+                        {
+                            err_msg = "Action Blocked: 'No Usage' skip can only be applied to Pay Per Use deployments, not Fixed Monthly.";
+                            precheck_ok = false;
+                        }
+                        else if(dep.Deployment_State != "Closed" && (dep.Billing_Mode == null || dep.Billing_Mode == ""))
+                        {
+                            err_msg = "Action Blocked: One or more active deployments are missing a Billing Mode.";
+                            precheck_ok = false;
+                        }
+                    }
+                }
+                
+                if(precheck_ok)
+                {
+                    // Pre-compute next cycles for all non-closed deployments before mutating
+                    next_cycle_map = map();
+                    anchor_map = map();
+                    for each dep in selected_deps
+                    {
+                        if(dep.Deployment_State != "Closed" && err_msg == "")
+                        {
+                            anchor_day = dep.Billing_Day;
+                            if(anchor_day == null || anchor_day < 1)
+                            {
+                                anchor_day = dep.Next_Billing_From.getDay();
+                            }
+                            next_cycle = thisapp.advance_billing_period(dep.Next_Billing_From, dep.Next_Billing_To, dep.Billing_Mode, anchor_day);
+                            if(next_cycle.containKey("_error"))
+                            {
+                                err_msg = next_cycle.get("_error");
+                            }
+                            else
+                            {
+                                next_cycle_map.put(dep.ID, next_cycle);
+                                anchor_map.put(dep.ID, anchor_day);
+                            }
+                        }
+                    }
+                    
+                    if(err_msg == "")
+                    {
+                        for each dep in selected_deps
+                        {
+                            period_lbl = dep.Next_Billing_Period;
+                            if(period_lbl == null || period_lbl == "")
+                            {
+                                period_lbl = dep.Next_Billing_From.toString("dd MMM yy") + " - " + dep.Next_Billing_To.toString("dd MMM yy");
+                            }
+                            
+                            if(is_no_usage)
+                            {
+                                dep.Last_Billed_Period = "No Usage (" + period_lbl + ")";
+                            }
+                            else
+                            {
+                                dep.Last_Billed_Period = period_lbl;
+                            }
+                            
+                            if(dep.Deployment_State == "Closed")
+                            {
+                                dep.Next_Billing_From = null;
+                                dep.Next_Billing_To = null;
+                                dep.Next_Billing_Period = null;
+                            }
+                            else if(next_cycle_map.containKey(dep.ID))
+                            {
+                                next_cycle = next_cycle_map.get(dep.ID);
+                                if(next_cycle.containKey("label"))
+                                {
+                                    dep.Billing_Day = anchor_map.get(dep.ID);
+                                    dep.Next_Billing_From = next_cycle.get("from");
+                                    dep.Next_Billing_To = next_cycle.get("to");
+                                    dep.Next_Billing_Period = next_cycle.get("label");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        ctx = "Deployments=" + deployment_ids + " | Billing_Action=" + billing_action;
+        err_msg = thisapp.format_error_log("handle_mark_deployments_billed", "scripts/functions/handle_mark_deployments_billed.deluge", "Mark_Deployments_Billed -> Submit -> On Click", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+    }
+    return err_msg;
+}

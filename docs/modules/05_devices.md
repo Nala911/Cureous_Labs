@@ -45,9 +45,9 @@
 6. **Current Customer** `[Lookup -> Customers, displaying Customer_Name - Hidden on Add]` (Customer deployment allocation)
    - Field Link Name: `Current_Customer`
    - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports.
-7. **Current Office** `[Lookup -> Offices, displaying Office_Name - Hidden on Add]` (Office / Warehouse location)
+7. **Current Office** `[Lookup -> Offices, displaying Office_Name - Auto-Default on Add]` (Office / Warehouse location)
    - Field Link Name: `Current_Office`
-   - Form Behavior: Hidden on Add; Visible & Locked in Edit mode; shown in reports. Updated via stock transfers / intake.
+   - Form Behavior: Visible & Enabled on Add (auto-defaults to `"Bangalore Office"` on load, user-editable); Visible & Locked in Edit mode; shown in reports. Updated via stock transfers / intake.
 8. **Device Stage** `[Dropdown - Hidden on Add]` (Manufacturing, Logistics & Maintenance stage; editable in Edit mode except while actively deployed)
    - Field Link Name: `Device_Stage`
    - Form Behavior: Hidden on Add (auto-initialized to `"0 - Mfg Not Yet Started"`); Visible & Enabled in Edit mode (locked while `Device_State` is `"Rentally Active"` or `"Active in Demo"`) with shared lifecycle options plus hardware-specific Stages 1–2 dynamically filtered by `Device_Type`.
@@ -79,7 +79,7 @@
 - **File**: `scripts/05_devices/form_devices/1_Devices_onload.deluge`
 - **Trigger**: Created or Edited -> Form Actions -> On Load
 - **Plain English Logic**:
-  - In ADD Mode: Enable `Serial_Number`, `Product_Model`, and `Lot` as interactive fields. Dynamically query `Lots` to auto-select the latest lot created by default. Keep `Device_Type` disabled to provide clear context without user editing. Hide lifecycle fields (`Current_Customer`, `Current_Office`, `Device_Stage`, `Device_State`).
+  - In ADD Mode: Enable `Serial_Number`, `Product_Model`, `Lot`, and `Current_Office` as interactive fields. Dynamically query `Lots` to auto-select the latest lot created by default and query `Offices` to auto-default `Current_Office` to `"Bangalore Office"`. Keep `Device_Type` disabled to provide clear context without user editing. Hide remaining lifecycle fields (`Current_Customer`, `Device_Stage`, `Device_State`).
   - In EDIT Mode: Lock `Serial_Number` and `Product_Model`. Keep `Lot` enabled so technicians can reassign lots if necessary. Display and lock context and lifecycle fields (`Device_State`, `Device_Type`, `Current_Customer`, `Current_Office`). Dynamically filter `Device_Stage` by clearing static choices via `clear Device_Stage;` and loading hardware-specific stages from the shared standalone function `scripts/functions/get_device_stages.deluge` (`thisapp.get_device_stages(dev_type)`), re-asserting the current saved stage, and enabling `Device_Stage` unless `Device_State` is `"Rentally Active"` or `"Active in Demo"` (locked while actively deployed).
 
 ### Workflow 2: On User Input (Step 1: Serial Number)
@@ -87,10 +87,10 @@
 - **Trigger**: Created or Edited -> Field Actions -> Serial_Number -> On User Input
 - **Plain English Logic**:
   - Step 1: If cleared, reset derived fields (`Device_Type`, `Product_Model`, `Device_Stage`, `Device_State`).
-  - Step 2: Duplicate check: Check if `Serial_Number` exists in `Devices`. If found, alert user and clear field.
-  - Step 3: Detect `Device_Type`: If contains `"CU"` -> `"Control Unit"`; if `"OV"` -> `"Overlay"`; else alert and clear.
+  - Step 2: Calls `scripts/functions/parse_device_serial.deluge` (`thisapp.parse_device_serial`) to sanitize `Serial_Number`, validate `CU`/`OV` and `ALT`/`ET` model prefix, and derive `Device_Type` and target `Product_Model` name.
+  - Step 3: Duplicate check: Check if `Serial_Number` exists in `Devices`. If found, alert user and clear dependent fields.
   - Step 4: Auto-initialize `Device_Stage` to `"0 - Mfg Not Yet Started"` for both Control Units and Overlays.
-  - Step 5: Detect `Product_Model`: Matches serial prefix to determine target model (`ALT` -> `"Altern4"`, `ET` -> `"Eturnal One"`), queries `Product_Models` to retrieve the matching record ID, and assigns `Product_Model` lookup, while allowing user to edit/reassign (e.g. choose `"Eturnal One with foam"`).
+  - Step 5: Queries `Product_Models` for the parsed model name to assign `Product_Model` lookup, while allowing user to edit/reassign (e.g. choose `"Eturnal One with foam"`).
   - Step 6: Initialize `Device_State = "Available in Stock"`.
 
 ### Workflow 2.2: On Update of Device Stage (Auto-Harmonization Guard)
@@ -109,7 +109,7 @@
   - Step 1: Mandatory check: Ensure `Serial_Number` is entered.
   - Step 2: Sanitize `Serial_Number` (trim & uppercase).
   - Step 3: Duplicate check: Query `Devices` to prevent duplicate serial numbers.
-  - Step 4: Verify syntax: Serial number must contain "CU" or "OV", and begin with valid prefix.
+  - Step 4: Verify syntax via shared `scripts/functions/parse_device_serial.deluge` (must contain "CU" or "OV", and begin with valid `ALT`/`ET` prefix).
   - Step 5: Safety fallback: Ensure `Device_Type`, `Product_Model` lookup (queries `Product_Models` for matching model ID if unassigned), `Lot` lookup (fallback to latest created lot from `Lots`), initial `Device_Stage` (`"0 - Mfg Not Yet Started"`), and `Device_State` (`"Available in Stock"`) are populated. Guard active Edit mode submissions so `"Rentally Active"` / `"Active in Demo"` devices remain at `"6 - Ready Condition"`.
   - Step 6: Bulk Edit & Compatibility Guard: Prevents assigning Overlay-specific Stages 1–2 to Control Units or Control Unit-specific Stages 1–2 to Overlays.
 
@@ -129,8 +129,10 @@ To provide high-speed, user-friendly batch processing without relying on Creator
 
 | Action Button Label | Report & Placement | Condition | Launcher Function & Namespace | Target Stateless Form | Script Folder |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Bulk Create Devices** *(Sidebar)* | Sidebar Navigation -> Devices / Utilities | Always | *Direct Form Open (no row selection needed)* | `Bulk_Create_Devices` | `scripts/05_devices/stateless_bulk_create/` |
 | **Update Stage** | `All_Devices` -> Multiple Records | Always | `open_update_stage(Devices selected_devices)` *(Namespace: `Default` / `devices_actions`)* | `Update_Device_Stage` | `scripts/05_devices/stateless_update_stage/` |
 | **Update Custody** | `All_Devices` -> Multiple Records | Always | `open_update_custody(Devices selected_devices)` *(Namespace: `Default` / `devices_actions`)* | `Update_Device_Custody` | `scripts/05_devices/stateless_update_custody/` |
+| **Deploy Devices** | `All_Devices` -> Multiple Records | Always | `open_deploy_devices(Devices selected_devices)` *(Namespace: `Default` / `devices_actions`)* | `Deployments` *(pre-filled popup)* | `scripts/05_devices/report_all_devices/` |
 
 ### A. Utility 1: Update Device Stage (`Update_Device_Stage`)
 - **Form Type**: Stateless Form (No record storage; executes Deluge on submit)
@@ -147,8 +149,8 @@ To provide high-speed, user-friendly batch processing without relying on Creator
 - **Workflows**:
   - **On Load**: `scripts/05_devices/stateless_update_stage/1_Update_Device_Stage_onload.deluge`
     - Dynamically filters `Select_Devices` via Deluge to exclude `"Rentally Active"` and `"Active in Demo"` devices, preserves eligible URL pre-fills and alerts if active units were excluded, and populates `New_Device_Stage` dynamically from `scripts/functions/get_device_stages.deluge`.
-  - **On Click of Submit**: `scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge`
-    - Validates selection and stage, fetches target device records in 1 batch query, blocks execution if any selected device is `"Rentally Active"` or `"Active in Demo"`, iterates and updates `Device_Stage` with automatic hardware-stage mapping, alerts user of success count, and closes/refreshes view.
+  - **On Click of Submit**: `scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge` (delegates to `scripts/functions/handle_update_device_stage.deluge`)
+    - Thin wrapper invokes `thisapp.handle_update_device_stage(...)` inside `try-catch` error protection (`format_error_log`). Validates selection and stage, fetches target device records in 1 batch query, blocks execution if any selected device is `"Rentally Active"` or `"Active in Demo"`, iterates and updates `Device_Stage` with automatic hardware-stage mapping, alerts only on validation/runtime error, and redirects silently to `All_Devices` on success.
 
 ### B. Utility 2: Update Device Custody (`Update_Device_Custody`)
 - **Form Type**: Stateless Form (No record storage; executes Deluge on submit)
@@ -157,27 +159,52 @@ To provide high-speed, user-friendly batch processing without relying on Creator
   1. **Select Devices** `[Lookup -> Devices, displaying Serial_Number - Multi-Select]`
      - Field Link Name: `Select_Devices`
      - Behavior: Interactive field populated by user or pre-filled from `All_Devices` report custom action; dynamically filtered via Deluge to exclude `"Rentally Active"` and `"Active in Demo"` devices.
-  2. **Destination Type** `[Radio / Dropdown]`
-     - Field Link Name: `Destination_Type`
-     - Choices: `"Internal Office Transfer"`, `"Customer Deployment"`
-  3. **Target Office** `[Lookup -> Offices, displaying Office_Name]`
+  2. **Target Office** `[Lookup -> Offices, displaying Office_Name]`
      - Field Link Name: `Target_Office`
-     - Behavior: Dynamically displayed when `Destination_Type == "Internal Office Transfer"`.
-  4. **Target Customer** `[Lookup -> Customers, displaying Customer_Name]`
+     - Behavior: Displayed side-by-side with `Target_Customer` on load; selecting an office auto-clears `Target_Customer`.
+  3. **Target Customer** `[Lookup -> Customers, displaying Customer_Name]`
      - Field Link Name: `Target_Customer`
-     - Behavior: Dynamically displayed when `Destination_Type == "Customer Deployment"`.
+     - Behavior: Displayed side-by-side with `Target_Office` on load; selecting a customer auto-clears `Target_Office`.
 - **Workflows**:
   - **On Load**: `scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge`
-    - Hides `Target_Office` and `Target_Customer` unless `Destination_Type` matches, and dynamically filters `Select_Devices` via Deluge to exclude `"Rentally Active"` and `"Active in Demo"` devices while preserving eligible pre-fills.
-  - **On User Input (Destination Type)**: `scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_destinationtype.deluge`
-    - Shows and enables `Target_Office` while hiding/clearing `Target_Customer` when `"Internal Office Transfer"` is chosen; shows and enables `Target_Customer` while hiding/clearing `Target_Office` when `"Customer Deployment"` is chosen.
-  - **On Click of Submit**: `scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge`
-    - Validates selections, fetches target devices and checks active states (`"Rentally Active"` / `"Active in Demo"`) plus open `Deployments` (`Deployment_State != "Closed"`). Enforces `"6 - Ready Condition"` when `Destination_Type == "Customer Deployment"`. For office transfer: updates `Current_Office`, clears `Current_Customer`, and sets `Device_State = "Available in Stock"`. For customer deployment: updates `Current_Customer`, clears `Current_Office`, and sets `Device_State = "Rentally Active"`. Alerts user of success count and closes/refreshes view.
+    - Ensures both `Target_Office` and `Target_Customer` are visible and enabled side-by-side, and dynamically filters `Select_Devices` via Deluge to exclude `"Rentally Active"` and `"Active in Demo"` devices while preserving eligible pre-fills.
+  - **On User Input (Target Office)**: `scripts/05_devices/stateless_update_custody/2_1_Update_Device_Custody_onuserinput_target_office.deluge`
+    - Auto-clears `Target_Customer` whenever a `Target_Office` is selected.
+  - **On User Input (Target Customer)**: `scripts/05_devices/stateless_update_custody/2_2_Update_Device_Custody_onuserinput_target_customer.deluge`
+    - Auto-clears `Target_Office` whenever a `Target_Customer` is selected.
+  - **On Click of Submit**: `scripts/05_devices/stateless_update_custody/5_1_Update_Device_Custody_onclick_submit.deluge` (delegates to `scripts/functions/handle_update_device_custody.deluge`)
+    - Thin wrapper invokes `thisapp.handle_update_device_custody(...)` inside `try-catch` error protection (`format_error_log`). Validates selections, fetches target devices and checks active states (`"Rentally Active"` / `"Active in Demo"`) plus open `Deployments` (`Deployment_State != "Closed"`). Enforces `"6 - Ready Condition"` when `Target_Customer` is selected. For `Target_Office`: updates `Current_Office`, clears `Current_Customer`, and sets `Device_State = "Available in Stock"`. For `Target_Customer`: updates `Current_Customer`, clears `Current_Office`, and sets `Device_State = "Idle with Customer"` (so devices are parked at the customer site until an active `Deployments` record marks them `"Rentally Active"` or `"Active in Demo"`). Alerts only on validation/runtime error, and redirects silently to `All_Devices` on success.
 
-### C. Report Custom Action Integration on `All_Devices`
+### C. Utility 3: Bulk Create Devices (`Bulk_Create_Devices`)
+- **Form Type**: Stateless Form (No record storage; launched from Sidebar navigation; executes Deluge on submit)
+- **Form Link Name**: `Bulk_Create_Devices`
+- **Fields**:
+  1. **Serial Numbers** `[Multi Line]`
+     - Field Link Name: `Serial_Numbers`
+     - Behavior: Mandatory user entry supporting Excel/Google Sheets pasted columns, spaces, commas, tabs, and semicolons.
+  2. **Device Rows (Editable Table)** `[Multi Line]`
+     - Field Link Name: `Device_Rows`
+     - Behavior: Editable pipe-separated tabular text (`Serial_Number | Product_Model | Lot | Device_Stage | Current_Office`) auto-populated on `Serial_Numbers` input via `scripts/functions/generate_bulk_device_rows.deluge` (defaulting `Lot` to latest Lot, `Device_Stage` to `"0 - Mfg Not Yet Started"`, and `Current_Office` to `"Bangalore Office"`). Users can edit any row's model, lot, stage, office, or serial directly before submitting, and `On User Input` live-refreshes `Reference_Guide`.
+  3. **Reference Guide** `[Multi Line]`
+     - Field Link Name: `Reference_Guide`
+     - Behavior: Disabled read-only context box populated cleanly with bulleted sections for Live Validation Status plus valid `Lots`, `Product_Models`, `Offices`, and grouped `Device_Stage` names (`Shared`, `Control Unit Only`, `Overlay Only`). Updated live on both `Serial_Numbers` and `Device_Rows` user input via `scripts/functions/validate_bulk_device_rows.deluge`.
+- **Workflows**:
+  - **On Load**: `scripts/05_devices/stateless_bulk_create/1_Bulk_Create_Devices_onload.deluge`
+    - Disables `Reference_Guide` and loads the `Device_Rows` header template plus valid master reference values via `generate_bulk_device_rows("")`.
+  - **On User Input (Serial Numbers)**: `scripts/05_devices/stateless_bulk_create/2_1_Bulk_Create_Devices_onuserinput_serial_numbers.deluge`
+    - Calls `scripts/functions/generate_bulk_device_rows.deluge` to parse tokens, classify hardware & product model via `parse_device_serial`, populate editable `Device_Rows` (with latest `Lot` and `"Bangalore Office"`), and delegate batch validation & formatted `Reference_Guide` output to `validate_bulk_device_rows`.
+  - **On User Input (Device Rows)**: `scripts/05_devices/stateless_bulk_create/2_2_Bulk_Create_Devices_onuserinput_device_rows.deluge`
+    - Calls `scripts/functions/validate_bulk_device_rows.deluge` to re-validate edited `Device_Rows` in real time and immediately refresh `Reference_Guide` so corrected errors clear and new row mistakes are flagged before submission.
+  - **On Click of Submit**: `scripts/05_devices/stateless_bulk_create/5_1_Bulk_Create_Devices_onclick_submit.deluge` (delegates to `scripts/functions/handle_bulk_create_devices.deluge`)
+    - Thin wrapper invokes `thisapp.handle_bulk_create_devices(input.Device_Rows, input.Serial_Numbers)` inside `try-catch`. Reuses `validate_bulk_device_rows` for strict per-row validation (with automatic `Serial_Numbers` fallback if submitted before blur), alerts exact row/field fixes needed on any error, inserts all `Devices` records with `Device_State = "Available in Stock"` once 100% pass, and redirects to `All_Devices`.
+
+### D. Report Custom Action Integration on `All_Devices`
 - **Action 1**: `Update Stage` -> Validates none of the selected devices are `"Rentally Active"` or `"Active in Demo"`, then opens `Update_Device_Stage` in a pop-up window mapping selected record IDs into `Select_Devices`.
   - **Function File**: `scripts/05_devices/report_all_devices/5_1_All_Devices_customaction_open_update_stage.deluge`
   - **Function Signature**: `void open_update_stage(Devices selected_devices)`
 - **Action 2**: `Update Custody` -> Validates none of the selected devices are `"Rentally Active"` or `"Active in Demo"`, then opens `Update_Device_Custody` in a pop-up window mapping selected record IDs into `Select_Devices`.
   - **Function File**: `scripts/05_devices/report_all_devices/5_2_All_Devices_customaction_open_update_custody.deluge`
   - **Function Signature**: `void open_update_custody(Devices selected_devices)`
+- **Action 3**: `Deploy Devices` -> Validates 1 or 2 ready devices (at most 1 Control Unit and 1 Overlay, matching `"Idle with Customer"` custody if applicable), then opens `Deployments` in a pre-filled popup window (`Control_Unit`, `Overlay`, `Customer`, and `Return_Report=All_Devices` so submit refreshes `All_Devices`).
+  - **Function File**: `scripts/05_devices/report_all_devices/5_3_All_Devices_customaction_open_deploy_devices.deluge`
+  - **Function Signature**: `void open_deploy_devices(Devices selected_devices)`

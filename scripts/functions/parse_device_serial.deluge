@@ -1,0 +1,83 @@
+// ==============================================================================
+// Module Name  : Devices (Shared Utility Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Devices workflows, validate_bulk_serials, and handle_bulk_create_devices
+// File Path    : scripts/functions/parse_device_serial.deluge
+// Fields Used  : None
+// Cross-Forms  : [Devices, Bulk_Create_Devices]
+// Purpose      : Single source of truth for parsing and classifying Cureous
+//                hardware serial numbers. Trims/uppercases serial, validates CU
+//                or OV token and ALT/ET model prefix, and returns a status map
+//                with clean_sn, is_valid ("true"/"false"), device_type,
+//                model_name, and error.
+// Optimization : Pure in-memory string inspection. Zero database queries.
+// ==============================================================================
+
+map parse_device_serial(string raw_sn)
+{
+    result = map();
+    result.put("clean_sn", "");
+    result.put("is_valid", "false");
+    result.put("device_type", "");
+    result.put("model_name", "");
+    result.put("error", "");
+    try
+    {
+        if(raw_sn == null || raw_sn.trim() == "")
+        {
+            result.put("error", "Serial Number cannot be empty.");
+            return result;
+        }
+        
+        clean_sn = raw_sn.trim().toUpperCase();
+        result.put("clean_sn", clean_sn);
+        
+        is_cu = clean_sn.contains("CU");
+        is_ov = clean_sn.contains("OV");
+        
+        if(!is_cu && !is_ov)
+        {
+            result.put("error", "Must contain 'CU' (Control Unit) or 'OV' (Overlay).");
+            return result;
+        }
+        if(is_cu && is_ov)
+        {
+            result.put("error", "Ambiguous type: contains both 'CU' and 'OV'.");
+            return result;
+        }
+        
+        target_model_name = "";
+        if(clean_sn.startsWith("ALT"))
+        {
+            target_model_name = "Altern4";
+        }
+        else if(clean_sn.startsWith("ET"))
+        {
+            target_model_name = "Eturnal One";
+        }
+        
+        if(target_model_name == "")
+        {
+            result.put("error", "Invalid model prefix (must start with 'ALT' or 'ET').");
+            return result;
+        }
+        
+        d_type = "Control Unit";
+        if(is_ov)
+        {
+            d_type = "Overlay";
+        }
+        
+        result.put("is_valid", "true");
+        result.put("device_type", d_type);
+        result.put("model_name", target_model_name);
+    }
+    catch (e)
+    {
+        ctx = "raw_sn=" + raw_sn;
+        err_log = thisapp.format_error_log("parse_device_serial", "scripts/functions/parse_device_serial.deluge", "Shared Utility Function", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+        result.put("error", err_log);
+        result.put("_error", err_log);
+    }
+    return result;
+}

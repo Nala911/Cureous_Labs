@@ -1,0 +1,431 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Live Validator & Reference Builder)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by generate_bulk_device_rows, Bulk_Create_Devices
+//                (Device_Rows -> On User Input), and handle_bulk_create_devices
+// File Path    : scripts/functions/validate_bulk_device_rows.deluge
+// Fields Used  : [Serial_Number, Product_Model_Name, Lot_ID, Office_Name]
+// Cross-Forms  : [Devices, Lots, Product_Models, Offices, Bulk_Create_Devices]
+// Purpose      : Single source of truth for validating Device_Rows tabular text
+//                and formatting a clean, readable Reference_Guide. Checks column
+//                count, serial syntax (parse_device_serial), duplicate rows,
+//                existing Devices records, Product_Models, Lots, Offices,
+//                Device_Stage validity, and CU/OV Stage 1-2 compatibility.
+// Optimization : Single queries for Lots, Product_Models, Offices, and 1 batch
+//                duplicate check against Devices. Zero queries inside loops.
+// ==============================================================================
+
+map validate_bulk_device_rows(string device_rows_text, string paste_note)
+{
+    result = map();
+    result.put("is_valid", "false");
+    result.put("has_data_rows", "false");
+    result.put("error_alert", "");
+    result.put("reference_text", "");
+    result.put("resolved_csv", "");
+    try
+    {
+        // 1. Pre-load master validation maps & readable reference lists (3 queries)
+        model_map = map();
+        model_bullets = "";
+        valid_models_csv = "";
+        for each pm in Product_Models[ID != null] sort by Product_Model_Name asc
+        {
+            model_map.put(pm.Product_Model_Name.trim().toUpperCase(), pm.ID);
+            model_bullets = model_bullets + "\n  - " + pm.Product_Model_Name;
+            if(valid_models_csv != "")
+            {
+                valid_models_csv = valid_models_csv + ", ";
+            }
+            valid_models_csv = valid_models_csv + pm.Product_Model_Name;
+        }
+        if(model_bullets == "")
+        {
+            model_bullets = "\n  (None found)";
+        }
+        
+        default_lot = "";
+        for each latest_lot in Lots[ID != null] sort by Added_Time desc range from 1 to 1
+        {
+            default_lot = latest_lot.Lot_ID;
+        }
+        
+        lot_map = map();
+        lot_bullets = "";
+        valid_lots_csv = "";
+        for each l_rec in Lots[ID != null] sort by Added_Time desc
+        {
+            lot_map.put(l_rec.Lot_ID.trim().toUpperCase(), l_rec.ID);
+            lot_tag = "";
+            if(l_rec.Lot_ID == default_lot)
+            {
+                lot_tag = "  (Default / Latest)";
+            }
+            lot_bullets = lot_bullets + "\n  - " + l_rec.Lot_ID + lot_tag;
+            if(valid_lots_csv != "")
+            {
+                valid_lots_csv = valid_lots_csv + ", ";
+            }
+            valid_lots_csv = valid_lots_csv + l_rec.Lot_ID;
+        }
+        if(lot_bullets == "")
+        {
+            lot_bullets = "\n  (None found - create a Lot first)";
+        }
+        
+        office_map = map();
+        office_bullets = "";
+        valid_offices_csv = "";
+        for each off_rec in Offices[ID != null] sort by Office_Name asc
+        {
+            office_map.put(off_rec.Office_Name.trim().toUpperCase(), off_rec.ID);
+            off_tag = "";
+            if(off_rec.Office_Name == "Bangalore Office")
+            {
+                off_tag = "  (Default)";
+            }
+            office_bullets = office_bullets + "\n  - " + off_rec.Office_Name + off_tag;
+            if(valid_offices_csv != "")
+            {
+                valid_offices_csv = valid_offices_csv + ", ";
+            }
+            valid_offices_csv = valid_offices_csv + off_rec.Office_Name;
+        }
+        if(office_bullets == "")
+        {
+            office_bullets = "\n  (None found)";
+        }
+        
+        stage_map = map();
+        all_stages = thisapp.get_device_stages("All");
+        for each stg_opt in all_stages
+        {
+            stage_map.put(stg_opt.trim().toUpperCase(), stg_opt);
+        }
+        
+        // 2. Parse and validate every data line in Device_Rows
+        row_errors = list();
+        seen_sns = list();
+        candidate_sns = list();
+        row_sn_labels = list();
+        resolved_lines = list();
+        row_num = 0;
+        
+        if(device_rows_text != null && device_rows_text.trim() != "")
+        {
+            norm_rows = device_rows_text.trim().replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+            lines = norm_rows.toList("\n");
+            for each raw_line in lines
+            {
+                line_trim = raw_line.trim();
+                if(line_trim != "")
+                {
+                    line_upper = line_trim.toUpperCase();
+                    if(!(line_upper.startsWith("SERIAL_NUMBER") && line_upper.contains("|")))
+                    {
+                        row_num = row_num + 1;
+                        safe_line = line_trim + "|_END_";
+                        cols = safe_line.toList("|");
+                        
+                        if(cols.size() != 5 && cols.size() != 6)
+                        {
+                            row_errors.add("Row " + row_num + ": Expected 5 columns separated by '|' (Serial_Number | Product_Model | Lot | Device_Stage | Current_Office), found " + (cols.size() - 1) + ".");
+                        }
+                        else
+                        {
+                            sn_cell = cols.get(0).toString().trim();
+                            model_cell = cols.get(1).toString().trim();
+                            lot_cell = cols.get(2).toString().trim();
+                            stage_cell = cols.get(3).toString().trim();
+                            office_cell = "";
+                            if(cols.size() == 6)
+                            {
+                                office_cell = cols.get(4).toString().trim();
+                            }
+                            
+                            row_ok = true;
+                            sn_label = sn_cell;
+                            if(sn_label == "")
+                            {
+                                sn_label = "<blank>";
+                            }
+                            
+                            // A. Serial syntax & duplicate in table
+                            clean_sn = "";
+                            d_type = "";
+                            p_res = thisapp.parse_device_serial(sn_cell);
+                            if(p_res.get("_error") != null && p_res.get("_error") != "")
+                            {
+                                result.put("_error", p_res.get("_error"));
+                                return result;
+                            }
+                            if(p_res.get("is_valid") != "true")
+                            {
+                                row_errors.add("Row " + row_num + " (" + sn_label + "): " + p_res.get("error").toString());
+                                row_ok = false;
+                            }
+                            else
+                            {
+                                clean_sn = p_res.get("clean_sn").toString();
+                                d_type = p_res.get("device_type").toString();
+                                sn_label = clean_sn;
+                                if(seen_sns.contains(clean_sn))
+                                {
+                                    row_errors.add("Row " + row_num + " (" + clean_sn + "): Duplicate serial in Device Rows. Remove duplicate row.");
+                                    row_ok = false;
+                                }
+                                else
+                                {
+                                    seen_sns.add(clean_sn);
+                                    candidate_sns.add(clean_sn);
+                                    row_sn_labels.add("Row " + row_num + " (" + clean_sn + ")");
+                                }
+                            }
+                            
+                            // B. Product Model lookup validation
+                            pm_id_num = 0;
+                            if(model_cell == "")
+                            {
+                                row_errors.add("Row " + row_num + " (" + sn_label + "): Product Model is required. Valid: " + valid_models_csv + ".");
+                                row_ok = false;
+                            }
+                            else
+                            {
+                                m_key = model_cell.toUpperCase();
+                                if(model_map.get(m_key) == null)
+                                {
+                                    row_errors.add("Row " + row_num + " (" + sn_label + "): Product Model '" + model_cell + "' not found. Valid: " + valid_models_csv + ".");
+                                    row_ok = false;
+                                }
+                                else
+                                {
+                                    pm_id_num = model_map.get(m_key).toLong();
+                                }
+                            }
+                            
+                            // C. Lot lookup validation
+                            lot_id_num = 0;
+                            if(lot_cell == "")
+                            {
+                                row_errors.add("Row " + row_num + " (" + sn_label + "): Lot is required. Valid: " + valid_lots_csv + ".");
+                                row_ok = false;
+                            }
+                            else
+                            {
+                                l_key = lot_cell.toUpperCase();
+                                if(lot_map.get(l_key) == null)
+                                {
+                                    row_errors.add("Row " + row_num + " (" + sn_label + "): Lot '" + lot_cell + "' does not exist. Valid: " + valid_lots_csv + ".");
+                                    row_ok = false;
+                                }
+                                else
+                                {
+                                    lot_id_num = lot_map.get(l_key).toLong();
+                                }
+                            }
+                            
+                            // D. Device Stage + CU/OV hardware compatibility validation
+                            canonical_stage = "0 - Mfg Not Yet Started";
+                            if(stage_cell != "")
+                            {
+                                s_key = stage_cell.toUpperCase();
+                                if(stage_map.get(s_key) == null)
+                                {
+                                    row_errors.add("Row " + row_num + " (" + sn_label + "): Device Stage '" + stage_cell + "' is invalid. Check Valid Device Stages below.");
+                                    row_ok = false;
+                                }
+                                else
+                                {
+                                    canonical_stage = stage_map.get(s_key).toString();
+                                    if(d_type == "Control Unit" && (canonical_stage == "1 - OV in Screen Printing / Welding" || canonical_stage == "2 - OV in Stitching"))
+                                    {
+                                        row_errors.add("Row " + row_num + " (" + sn_label + "): Cannot assign Overlay stage '" + canonical_stage + "' to a Control Unit.");
+                                        row_ok = false;
+                                    }
+                                    else if(d_type == "Overlay" && (canonical_stage == "1 - CU Enclosure Mfg in Progress" || canonical_stage == "2 - CU Subsystems Assembled"))
+                                    {
+                                        row_errors.add("Row " + row_num + " (" + sn_label + "): Cannot assign Control Unit stage '" + canonical_stage + "' to an Overlay.");
+                                        row_ok = false;
+                                    }
+                                }
+                            }
+                            
+                            // E. Current Office lookup validation (optional)
+                            office_id_num = 0;
+                            if(office_cell != "")
+                            {
+                                o_key = office_cell.toUpperCase();
+                                if(office_map.get(o_key) == null)
+                                {
+                                    row_errors.add("Row " + row_num + " (" + sn_label + "): Office '" + office_cell + "' does not exist. Valid: " + valid_offices_csv + " (or leave blank).");
+                                    row_ok = false;
+                                }
+                                else
+                                {
+                                    office_id_num = office_map.get(o_key).toLong();
+                                }
+                            }
+                            
+                            if(row_ok)
+                            {
+                                resolved_lines.add(clean_sn + "|" + d_type + "|" + pm_id_num + "|" + lot_id_num + "|" + canonical_stage + "|" + office_id_num);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if(row_num > 0)
+        {
+            result.put("has_data_rows", "true");
+        }
+        
+        // 3. Batch duplicate check against existing Devices records
+        db_dup_count = 0;
+        if(candidate_sns.size() > 0)
+        {
+            existing_set = list();
+            for each ex_dev in Devices[Serial_Number in candidate_sns]
+            {
+                existing_set.add(ex_dev.Serial_Number);
+            }
+            if(existing_set.size() > 0)
+            {
+                c_idx = 0;
+                for each cand in candidate_sns
+                {
+                    if(existing_set.contains(cand))
+                    {
+                        db_dup_count = db_dup_count + 1;
+                        row_errors.add(row_sn_labels.get(c_idx).toString() + ": Already registered in Devices. Remove this row.");
+                    }
+                    c_idx = c_idx + 1;
+                }
+            }
+        }
+        
+        if(row_num > 100)
+        {
+            row_errors.add("Batch Limit Exceeded: " + row_num + " rows entered (max 100 per submit).");
+        }
+        
+        // 4. Build readable Status & Reference Guide
+        ready_count = resolved_lines.size() - db_dup_count;
+        if(ready_count < 0)
+        {
+            ready_count = 0;
+        }
+        
+        ref = "============================================================";
+        ref = ref + "\nVALIDATION STATUS";
+        ref = ref + "\n============================================================";
+        
+        if(row_num == 0)
+        {
+            ref = ref + "\nWaiting for serial numbers.";
+            ref = ref + "\n  - Paste serial numbers in 'Serial Numbers' (one per line, space, or comma),";
+            ref = ref + "\n    then click outside the box to auto-fill 'Device Rows'.";
+            result.put("error_alert", "No Devices Entered:\n\nPlease paste Serial Numbers or add data rows in Device Rows before submitting.");
+        }
+        else if(row_errors.size() == 0)
+        {
+            ref = ref + "\nALL " + row_num + " ROW(S) READY TO CREATE";
+            ref = ref + "\n  - Valid & New Rows : " + ready_count;
+            ref = ref + "\n  - Issues Found     : 0";
+            if(paste_note != null && paste_note != "")
+            {
+                ref = ref + "\n" + paste_note;
+            }
+            ref = ref + "\n  -> Click Submit to create " + row_num + " device(s).";
+            
+            resolved_csv = "";
+            for each r_line in resolved_lines
+            {
+                if(resolved_csv != "")
+                {
+                    resolved_csv = resolved_csv + "\n";
+                }
+                resolved_csv = resolved_csv + r_line;
+            }
+            result.put("resolved_csv", resolved_csv);
+            result.put("is_valid", "true");
+        }
+        else
+        {
+            ref = ref + "\n" + row_errors.size() + " ISSUE(S) FOUND - Edit 'Device Rows' above to fix:";
+            ref = ref + "\n  - Total Rows       : " + row_num;
+            ref = ref + "\n  - Ready Rows       : " + ready_count;
+            ref = ref + "\n  - Issues to Fix    : " + row_errors.size();
+            if(paste_note != null && paste_note != "")
+            {
+                ref = ref + "\n" + paste_note;
+            }
+            ref = ref + "\n\nIssues Details:";
+            for each err_item in row_errors
+            {
+                ref = ref + "\n  [!] " + err_item;
+            }
+            
+            alert_text = "Validation Failed (" + row_errors.size() + " issue(s)) - No devices were created:\n";
+            shown = 0;
+            for each e_line in row_errors
+            {
+                if(shown < 8)
+                {
+                    alert_text = alert_text + "\n- " + e_line;
+                    shown = shown + 1;
+                }
+            }
+            if(row_errors.size() > 8)
+            {
+                alert_text = alert_text + "\n- ... and " + (row_errors.size() - 8) + " more issue(s). See Reference Guide.";
+            }
+            result.put("error_alert", alert_text);
+        }
+        
+        if(row_num == 0 && paste_note != null && paste_note != "")
+        {
+            ref = ref + "\n" + paste_note;
+        }
+        
+        ref = ref + "\n\n============================================================";
+        ref = ref + "\nVALID VALUES REFERENCE (Copy exact spelling when editing)";
+        ref = ref + "\n============================================================";
+        ref = ref + "\nRow Format (keep '|' separators; Office optional):";
+        ref = ref + "\n  Serial_Number | Product_Model | Lot | Device_Stage | Current_Office";
+        ref = ref + "\n\nValid Lots:" + lot_bullets;
+        ref = ref + "\n\nValid Product Models:" + model_bullets;
+        ref = ref + "\n\nValid Offices (leave blank for unassigned):" + office_bullets;
+        ref = ref + "\n\nValid Device Stages:";
+        ref = ref + "\n  Shared (Control Unit & Overlay):";
+        ref = ref + "\n    - 0 - Mfg Not Yet Started";
+        ref = ref + "\n    - 3 - Yet to Assemble";
+        ref = ref + "\n    - 4 - Assembly in Progress";
+        ref = ref + "\n    - 5 - Assembly Completed & Not Tested";
+        ref = ref + "\n    - 6 - Ready Condition";
+        ref = ref + "\n    - Retesting Needed";
+        ref = ref + "\n    - Repair Needed";
+        ref = ref + "\n    - Disinfection Needed";
+        ref = ref + "\n  Control Unit Only:";
+        ref = ref + "\n    - 1 - CU Enclosure Mfg in Progress";
+        ref = ref + "\n    - 2 - CU Subsystems Assembled";
+        ref = ref + "\n  Overlay Only:";
+        ref = ref + "\n    - 1 - OV in Screen Printing / Welding";
+        ref = ref + "\n    - 2 - OV in Stitching";
+        
+        result.put("reference_text", ref);
+    }
+    catch (e)
+    {
+        rows_len = 0;
+        if(device_rows_text != null)
+        {
+            rows_len = device_rows_text.length();
+        }
+        err_log = thisapp.format_error_log("validate_bulk_device_rows", "scripts/functions/validate_bulk_device_rows.deluge", "Live Validation Function", "" + e.lineNo, "" + e.type, "" + e.message, "rows_len=" + rows_len);
+        result.put("_error", err_log);
+        result.put("error_alert", err_log);
+    }
+    return result;
+}

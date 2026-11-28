@@ -1,0 +1,128 @@
+// ==============================================================================
+// Module Name  : Close Deployments (Action Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Close_Deployments -> Submit -> On Click
+// File Path    : scripts/functions/handle_close_deployments.deluge
+// Fields Used  : [Deployments, End_Date, Collected, Return_Office, Device_Condition]
+// Cross-Forms  : [Deployments, Devices]
+// Purpose      : Validates closure inputs and dates, caps/preserves final billing
+//                periods, batch-closes Deployments, and batch-updates linked
+//                Devices inside try-catch.
+// Optimization : Two batch queries ([ID in dep_ids] and [ID in dev_ids]).
+// ==============================================================================
+
+string handle_close_deployments(list deployment_ids, date end_date, bool is_collected, int return_office, string device_condition)
+{
+    err_msg = "";
+    try
+    {
+        if(deployment_ids == null || deployment_ids.isEmpty())
+        {
+            err_msg = "Please select at least one deployment to close.";
+        }
+        else if(end_date == null)
+        {
+            err_msg = "End Date is mandatory when closing deployments.";
+        }
+        else if(device_condition == null || device_condition == "")
+        {
+            err_msg = "Device Condition is mandatory when closing deployments.";
+        }
+        else if(is_collected && return_office == null)
+        {
+            err_msg = "Please select the Return Office since Collected? is checked.";
+        }
+        else
+        {
+            selected_deps = Deployments[ID in deployment_ids];
+            if(selected_deps.count() == 0)
+            {
+                err_msg = "No matching deployment records found for the selected IDs.";
+            }
+            else
+            {
+                date_error = false;
+                for each dep in selected_deps
+                {
+                    if(dep.Deployment_State != "Closed" && dep.Start_Date != null && end_date < dep.Start_Date)
+                    {
+                        err_msg = "Invalid End Date: End Date cannot be earlier than Start Date (" + dep.Start_Date + ") for one or more selected deployments.";
+                        date_error = true;
+                    }
+                }
+                
+                if(!date_error)
+                {
+                    dev_ids = list();
+                    for each dep in selected_deps
+                    {
+                        if(dep.Deployment_State != "Closed")
+                        {
+                            was_rental = (dep.Deployment_State == "Rental");
+                            dep.Deployment_State = "Closed";
+                            dep.End_Date = end_date;
+                            
+                            if(was_rental && dep.Next_Billing_From != null)
+                            {
+                                if(end_date < dep.Next_Billing_From)
+                                {
+                                    dep.Next_Billing_From = null;
+                                    dep.Next_Billing_To = null;
+                                    dep.Next_Billing_Period = null;
+                                }
+                                else if(dep.Billing_Mode == "Pay Per Use" && dep.Next_Billing_To != null && end_date < dep.Next_Billing_To)
+                                {
+                                    dep.Next_Billing_To = end_date;
+                                    dep.Next_Billing_Period = dep.Next_Billing_From.toString("dd MMM yy") + " - " + end_date.toString("dd MMM yy");
+                                }
+                            }
+                            
+                            if(dep.Control_Unit != null)
+                            {
+                                cu_id = dep.Control_Unit;
+                                if(!dev_ids.contains(cu_id))
+                                {
+                                    dev_ids.add(cu_id);
+                                }
+                            }
+                            if(dep.Overlay != null)
+                            {
+                                ov_id = dep.Overlay;
+                                if(!dev_ids.contains(ov_id))
+                                {
+                                    dev_ids.add(ov_id);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if(dev_ids.size() > 0)
+                    {
+                        affected_devs = Devices[ID in dev_ids];
+                        for each dev in affected_devs
+                        {
+                            dev.Device_Stage = device_condition;
+                            if(is_collected)
+                            {
+                                dev.Device_State = "Available in Stock";
+                                dev.Current_Customer = null;
+                                dev.Current_Office = return_office;
+                            }
+                            else
+                            {
+                                dev.Device_State = "Idle with Customer";
+                                dev.Current_Office = null;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        ctx = "Deployments=" + deployment_ids + " | End_Date=" + end_date + " | Collected=" + is_collected + " | Return_Office=" + return_office + " | Device_Condition=" + device_condition;
+        err_msg = thisapp.format_error_log("handle_close_deployments", "scripts/functions/handle_close_deployments.deluge", "Close_Deployments -> Submit -> On Click", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+    }
+    return err_msg;
+}

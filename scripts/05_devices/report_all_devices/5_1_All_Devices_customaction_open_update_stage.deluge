@@ -13,32 +13,42 @@
 
 void open_update_stage(Devices selected_devices)
 {
-    // 1. Validate no actively deployed devices are selected
-    id_list = list();
-    blocked_count = 0;
-    for each dev in selected_devices
+    sel_count = 0;
+    try
     {
-        if(dev.Device_State == "Rentally Active" || dev.Device_State == "Active in Demo")
+        // 1. Validate no actively deployed devices are selected
+        id_list = list();
+        blocked_count = 0;
+        for each dev in selected_devices
         {
-            blocked_count = blocked_count + 1;
+            sel_count = sel_count + 1;
+            if(dev.Device_State == "Rentally Active" || dev.Device_State == "Active in Demo")
+            {
+                blocked_count = blocked_count + 1;
+            }
+            else
+            {
+                id_list.add(dev.ID);
+            }
+        }
+        
+        // 2. Block if any active deployment device is included, otherwise open modal
+        if(id_list.size() == 0)
+        {
+            alert "Please select at least one device to update.";
+        }
+        else if(blocked_count > 0)
+        {
+            alert "Update Stage Blocked:\n\n" + blocked_count + " selected device(s) are currently Rentally Active or Active in Demo. Please use Close Deployments or Swap Devices before updating their Device Stage.";
         }
         else
         {
-            id_list.add(dev.ID);
+            openUrl("#Form:Update_Device_Stage?Select_Devices=" + id_list, "popup window", "height=600px,width=700px");
         }
     }
-    
-    // 2. Block if any active deployment device is included, otherwise open modal
-    if(id_list.size() == 0)
+    catch (e)
     {
-        alert "Please select at least one device to update.";
-    }
-    else if(blocked_count > 0)
-    {
-        alert "Update Stage Blocked:\n\n" + blocked_count + " selected device(s) are currently Rentally Active or Active in Demo. Please use Close Deployments or Swap Devices before updating their Device Stage.";
-    }
-    else
-    {
-        openUrl("#Form:Update_Device_Stage?Select_Devices=" + id_list, "popup window", "height=600px,width=700px");
+        err_log = thisapp.format_error_log("open_update_stage", "scripts/05_devices/report_all_devices/5_1_All_Devices_customaction_open_update_stage.deluge", "All_Devices -> Update Stage", "" + e.lineNo, "" + e.type, "" + e.message, "selected_count=" + sel_count);
+        alert err_log;
     }
 }

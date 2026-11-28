@@ -1,0 +1,23 @@
+// ==============================================================================
+// Module Name  : Deployments (Form Link Name: Deployments)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Rental_Rate -> On User Input
+// File Path    : scripts/07_deployments/form_deployments/2_5_Deployments_onuserinput_rental_rate.deluge
+// Fields Used  : [Rental_Rate, GST_Amount, Invoice_Amount]
+// Cross-Forms  : None
+// Purpose      : Auto-calculates 5% GST_Amount and total Invoice_Amount whenever
+//                Rental_Rate is entered or modified for a Fixed Monthly rental.
+// Optimization : Zero database queries. Runs in <1ms.
+// ==============================================================================
+
+if(input.Rental_Rate != null)
+{
+    gst_val = (input.Rental_Rate * 0.05).round(2);
+    input.GST_Amount = gst_val;
+    input.Invoice_Amount = input.Rental_Rate + gst_val;
+}
+else
+{
+    input.GST_Amount = null;
+    input.Invoice_Amount = null;
+}

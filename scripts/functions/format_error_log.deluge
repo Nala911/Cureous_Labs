@@ -1,0 +1,62 @@
+// ==============================================================================
+// Module Name  : Core Error Handling (Shared Utility Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called from catch(e) blocks across Standalone & Custom Action Functions
+// File Path    : scripts/functions/format_error_log.deluge
+// Fields Used  : None
+// Cross-Forms  : All Modules
+// Purpose      : Builds a standardized, copy-pasteable [CUREOUS SCRIPT ERROR]
+//                diagnostic block containing Function, File Path, Trigger, Line,
+//                Type, Message, and Input Context so errors can be pasted directly
+//                into Antigravity for rapid diagnosis.
+// Optimization : Pure string concatenation with null guards. Zero queries.
+// ==============================================================================
+
+string format_error_log(string fn_name, string file_path, string trigger_hook, string err_line, string err_type, string err_msg, string context_info)
+{
+    safe_fn = "Unknown";
+    if(fn_name != null && fn_name != "")
+    {
+        safe_fn = fn_name;
+    }
+    safe_file = "Unknown";
+    if(file_path != null && file_path != "")
+    {
+        safe_file = file_path;
+    }
+    safe_trigger = "Unknown";
+    if(trigger_hook != null && trigger_hook != "")
+    {
+        safe_trigger = trigger_hook;
+    }
+    safe_line = "Unknown";
+    if(err_line != null && err_line != "" && err_line != "null")
+    {
+        safe_line = err_line;
+    }
+    safe_type = "System";
+    if(err_type != null && err_type != "" && err_type != "null")
+    {
+        safe_type = err_type;
+    }
+    safe_msg = "Unexpected runtime error.";
+    if(err_msg != null && err_msg != "" && err_msg != "null")
+    {
+        safe_msg = err_msg;
+    }
+    safe_ctx = "None";
+    if(context_info != null && context_info != "")
+    {
+        safe_ctx = context_info;
+    }
+    
+    out = "[CUREOUS SCRIPT ERROR]\n";
+    out = out + "Function : " + safe_fn + "\n";
+    out = out + "File     : " + safe_file + "\n";
+    out = out + "Trigger  : " + safe_trigger + "\n";
+    out = out + "Line     : " + safe_line + "\n";
+    out = out + "Type     : " + safe_type + "\n";
+    out = out + "Message  : " + safe_msg + "\n";
+    out = out + "Context  : " + safe_ctx;
+    return out;
+}

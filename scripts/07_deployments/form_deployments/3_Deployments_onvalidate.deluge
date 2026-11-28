@@ -3,11 +3,14 @@
 // Script Type  : Form Workflow (On Validate)
 // Trigger Hook : Created or Edited -> Form Actions -> On Validate
 // File Path    : scripts/07_deployments/form_deployments/3_Deployments_onvalidate.deluge
-// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date, Deployment_State, Deployment_Summary]
+// Fields Used  : [Customer, Control_Unit, Overlay, Start_Date, End_Date,
+//                 Deployment_State, Deployment_Summary, Billing_Mode, Rental_Rate,
+//                 GST_Amount, Invoice_Amount, Billing_Day, Next_Billing_From,
+//                 Next_Billing_To, Next_Billing_Period, Last_Billed_Period]
 // Cross-Forms  : [Deployments, Devices, Customers]
 // Purpose      : Enforces mandatory fields, validates dates, ensures at least
-//                one physical device is selected, checks hardware types, and
-//                prevents double-booking an active Control Unit or Overlay.
+//                one physical device is selected, checks hardware types, prevents
+//                double-booking, and validates/computes commercial billing fields.
 // Optimization : Targeted indexed criteria queries evaluated only on submit.
 // ==============================================================================
 
@@ -50,7 +53,65 @@ if(input.Deployment_State == "Closed" && input.End_Date == null)
     cancel submit;
 }
 
-// 4. Hardware Type Verification & Add-Mode Readiness Parity
+// 4. Commercial Billing Mode & Period Validations
+if(input.Deployment_State == "Rental")
+{
+    if(input.Billing_Mode == null || input.Billing_Mode == "")
+    {
+        alert "Billing Mode is mandatory for Rental deployments (select Pay Per Use or Fixed Monthly).";
+        cancel submit;
+    }
+    
+    if(input.Billing_Mode == "Fixed Monthly")
+    {
+        if(input.Rental_Rate == null || input.Rental_Rate <= 0)
+        {
+            alert "Rental Rate must be greater than 0 for Fixed Monthly rentals.";
+            cancel submit;
+        }
+        gst_val = (input.Rental_Rate * 0.05).round(2);
+        input.GST_Amount = gst_val;
+        input.Invoice_Amount = input.Rental_Rate + gst_val;
+    }
+    else
+    {
+        input.Rental_Rate = null;
+        input.GST_Amount = null;
+        input.Invoice_Amount = null;
+    }
+    
+    // Initialize or refresh first unbilled period from Start_Date prior to first billing
+    if(input.Last_Billed_Period == null || input.Last_Billed_Period == "")
+    {
+        anchor_day = input.Start_Date.getDay();
+        cycle = thisapp.compute_billing_period(input.Start_Date, input.Billing_Mode, anchor_day);
+        if(cycle.containKey("_error"))
+        {
+            alert cycle.get("_error");
+            cancel submit;
+        }
+        else if(cycle.containKey("label"))
+        {
+            input.Billing_Day = anchor_day;
+            input.Next_Billing_From = cycle.get("from");
+            input.Next_Billing_To = cycle.get("to");
+            input.Next_Billing_Period = cycle.get("label");
+        }
+    }
+}
+else if(input.Deployment_State == "Demo" || input.Deployment_State == "Idle")
+{
+    input.Billing_Mode = null;
+    input.Rental_Rate = null;
+    input.GST_Amount = null;
+    input.Invoice_Amount = null;
+    input.Billing_Day = null;
+    input.Next_Billing_From = null;
+    input.Next_Billing_To = null;
+    input.Next_Billing_Period = null;
+}
+
+// 5. Hardware Type Verification & Add-Mode Readiness Parity
 cu_dev = null;
 ov_dev = null;
 if(input.Control_Unit != null)
@@ -71,9 +132,14 @@ if(input.Control_Unit != null)
                 alert "Deployment Blocked: Control Unit " + cu_dev.Serial_Number + " is at stage '" + cu_dev.Device_Stage + "'. Only '6 - Ready Condition' devices can be deployed.";
                 cancel submit;
             }
-            if(cu_dev.Device_State != "Available in Stock")
+            if(cu_dev.Device_State != "Available in Stock" && cu_dev.Device_State != "Idle with Customer")
             {
-                alert "Deployment Blocked: Control Unit " + cu_dev.Serial_Number + " has state '" + cu_dev.Device_State + "'. Only 'Available in Stock' devices can be deployed.";
+                alert "Deployment Blocked: Control Unit " + cu_dev.Serial_Number + " has state '" + cu_dev.Device_State + "'. Only 'Available in Stock' or 'Idle with Customer' devices can be deployed.";
+                cancel submit;
+            }
+            if(cu_dev.Device_State == "Idle with Customer" && cu_dev.Current_Customer != null && cu_dev.Current_Customer != input.Customer)
+            {
+                alert "Custody Mismatch: Control Unit " + cu_dev.Serial_Number + " is 'Idle with Customer' at a different customer site. Transfer custody first or select the matching customer.";
                 cancel submit;
             }
         }
@@ -98,16 +164,21 @@ if(input.Overlay != null)
                 alert "Deployment Blocked: Overlay " + ov_dev.Serial_Number + " is at stage '" + ov_dev.Device_Stage + "'. Only '6 - Ready Condition' devices can be deployed.";
                 cancel submit;
             }
-            if(ov_dev.Device_State != "Available in Stock")
+            if(ov_dev.Device_State != "Available in Stock" && ov_dev.Device_State != "Idle with Customer")
             {
-                alert "Deployment Blocked: Overlay " + ov_dev.Serial_Number + " has state '" + ov_dev.Device_State + "'. Only 'Available in Stock' devices can be deployed.";
+                alert "Deployment Blocked: Overlay " + ov_dev.Serial_Number + " has state '" + ov_dev.Device_State + "'. Only 'Available in Stock' or 'Idle with Customer' devices can be deployed.";
+                cancel submit;
+            }
+            if(ov_dev.Device_State == "Idle with Customer" && ov_dev.Current_Customer != null && ov_dev.Current_Customer != input.Customer)
+            {
+                alert "Custody Mismatch: Overlay " + ov_dev.Serial_Number + " is 'Idle with Customer' at a different customer site. Transfer custody first or select the matching customer.";
                 cancel submit;
             }
         }
     }
 }
 
-// 5. Double-Booking Prevention: Guard against overlapping active deployments
+// 6. Double-Booking Prevention: Guard against overlapping active deployments
 if(input.Deployment_State != "Closed")
 {
     curr_id = 0;
@@ -141,7 +212,7 @@ if(input.Deployment_State != "Closed")
     }
 }
 
-// 6. Populate Compact Human-Readable Deployment Summary
+// 7. Populate Compact Human-Readable Deployment Summary
 target_cust_id = input.Customer;
 cust_rec = Customers[ID == target_cust_id];
 short_cust = "";

@@ -3,12 +3,15 @@
 // Script Type  : Form Workflow (On User Input)
 // Trigger Hook : Created or Edited -> Field Actions -> Deployment_State -> On User Input
 // File Path    : scripts/07_deployments/form_deployments/2_3_Deployments_onuserinput_deployment_state.deluge
-// Fields Used  : [Deployment_State, End_Date]
+// Fields Used  : [Deployment_State, End_Date, Start_Date, Billing_Mode, Rental_Rate,
+//                 GST_Amount, Invoice_Amount, Billing_Day, Next_Billing_From,
+//                 Next_Billing_To, Next_Billing_Period, Last_Billed_Period]
 // Cross-Forms  : None
-// Purpose      : Defensive UI handler for Deployment_State transitions: reveals
-//                and auto-populates End_Date if Closed is present, and hides/clears
-//                auto-set End_Date for active states (Rental, Demo, Idle).
-// Optimization : Zero database queries. Runs in <1ms.
+// Purpose      : Handles UI transitions for Deployment_State: manages End_Date
+//                visibility and toggles commercial billing fields for Rental vs
+//                non-rental states (Demo / Idle), initializing Next_Billing_*
+//                when transitioning into Rental before first billing.
+// Optimization : Zero database queries. Runs in <2ms.
 // ==============================================================================
 
 if(input.Deployment_State == "Closed")
@@ -26,5 +29,68 @@ else
     if(input.ID == null || input.End_Date == zoho.currentdate)
     {
         input.End_Date = null;
+    }
+    
+    if(input.Deployment_State == "Rental")
+    {
+        show Billing_Mode;
+        has_billed = (input.Last_Billed_Period != null && input.Last_Billed_Period != "");
+        if(has_billed)
+        {
+            disable Billing_Mode;
+        }
+        else
+        {
+            enable Billing_Mode;
+        }
+        show Next_Billing_Period;
+        
+        if(input.Billing_Mode == "Fixed Monthly")
+        {
+            show Rental_Rate;
+            enable Rental_Rate;
+            show GST_Amount;
+            show Invoice_Amount;
+        }
+        else
+        {
+            hide Rental_Rate;
+            hide GST_Amount;
+            hide Invoice_Amount;
+        }
+        
+        if(!has_billed && input.Start_Date != null && input.Billing_Mode != null && input.Billing_Mode != "")
+        {
+            anchor_day = input.Start_Date.getDay();
+            cycle = thisapp.compute_billing_period(input.Start_Date, input.Billing_Mode, anchor_day);
+            if(cycle.containKey("_error"))
+            {
+                alert cycle.get("_error");
+            }
+            else if(cycle.containKey("label"))
+            {
+                input.Billing_Day = anchor_day;
+                input.Next_Billing_From = cycle.get("from");
+                input.Next_Billing_To = cycle.get("to");
+                input.Next_Billing_Period = cycle.get("label");
+            }
+        }
+    }
+    else
+    {
+        hide Billing_Mode;
+        hide Rental_Rate;
+        hide GST_Amount;
+        hide Invoice_Amount;
+        hide Next_Billing_Period;
+        
+        input.Billing_Mode = null;
+        input.Rental_Rate = null;
+        input.GST_Amount = null;
+        input.Invoice_Amount = null;
+        input.Billing_Day = null;
+        input.Next_Billing_From = null;
+        input.Next_Billing_To = null;
+        input.Next_Billing_Period = null;
     }
 }

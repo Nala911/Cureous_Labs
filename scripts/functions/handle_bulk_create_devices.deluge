@@ -1,0 +1,103 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Action Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Bulk_Create_Devices -> Submit -> On Click
+// File Path    : scripts/functions/handle_bulk_create_devices.deluge
+// Fields Used  : [Device_Rows, Serial_Numbers]
+// Cross-Forms  : [Devices, Lots, Product_Models, Offices]
+// Purpose      : Delegates complete row-by-row validation to
+//                validate_bulk_device_rows (with automatic fallback generation
+//                from Serial_Numbers if Device_Rows has no data rows yet).
+//                Inserts all validated Devices records atomically after all
+//                rows pass inside try-catch error protection.
+// Optimization : Single-pass validation via validate_bulk_device_rows followed
+//                by direct record insertion with zero extra lookups.
+// ==============================================================================
+
+string handle_bulk_create_devices(string device_rows_text, string raw_serials)
+{
+    err_msg = "";
+    try
+    {
+        val_res = thisapp.validate_bulk_device_rows(device_rows_text, "");
+        if(val_res.get("_error") != null && val_res.get("_error") != "")
+        {
+            return val_res.get("_error").toString();
+        }
+        
+        // Fallback: if user clicked Submit immediately after pasting Serial_Numbers
+        if(val_res.get("has_data_rows") != "true" && raw_serials != null && raw_serials.trim() != "")
+        {
+            gen_res = thisapp.generate_bulk_device_rows(raw_serials);
+            if(gen_res.get("_error") != null && gen_res.get("_error") != "")
+            {
+                return gen_res.get("_error").toString();
+            }
+            generated_rows = gen_res.get("device_rows_text").toString();
+            val_res = thisapp.validate_bulk_device_rows(generated_rows, "");
+            if(val_res.get("_error") != null && val_res.get("_error") != "")
+            {
+                return val_res.get("_error").toString();
+            }
+        }
+        
+        if(val_res.get("is_valid") != "true")
+        {
+            return val_res.get("error_alert").toString();
+        }
+        
+        resolved_csv = val_res.get("resolved_csv").toString();
+        if(resolved_csv == "")
+        {
+            return "No Devices Entered:\n\nPlease paste Serial Numbers or add data rows in Device Rows before submitting.";
+        }
+        
+        resolved_lines = resolved_csv.toList("\n");
+        for each r_line in resolved_lines
+        {
+            parts = r_line.toList("|");
+            r_sn = parts.get(0).toString();
+            r_type = parts.get(1).toString();
+            r_pm_id = parts.get(2).toLong();
+            r_lot_id = parts.get(3).toLong();
+            r_stage = parts.get(4).toString();
+            r_off_id = parts.get(5).toLong();
+            
+            if(r_off_id != 0)
+            {
+                insert into Devices
+                [
+                    Serial_Number = r_sn
+                    Device_Type = r_type
+                    Product_Model = r_pm_id
+                    Lot = r_lot_id
+                    Device_Stage = r_stage
+                    Device_State = "Available in Stock"
+                    Current_Office = r_off_id
+                ]
+            }
+            else
+            {
+                insert into Devices
+                [
+                    Serial_Number = r_sn
+                    Device_Type = r_type
+                    Product_Model = r_pm_id
+                    Lot = r_lot_id
+                    Device_Stage = r_stage
+                    Device_State = "Available in Stock"
+                ]
+            }
+        }
+    }
+    catch (e)
+    {
+        rows_len = 0;
+        if(device_rows_text != null)
+        {
+            rows_len = device_rows_text.length();
+        }
+        err_msg = thisapp.format_error_log("handle_bulk_create_devices", "scripts/functions/handle_bulk_create_devices.deluge", "Bulk Create Devices Submit On Click", "" + e.lineNo, "" + e.type, "" + e.message, "rows_len=" + rows_len);
+    }
+    return err_msg;
+}

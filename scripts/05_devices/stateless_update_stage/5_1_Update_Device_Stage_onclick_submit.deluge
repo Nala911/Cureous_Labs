@@ -5,115 +5,18 @@
 // File Path    : scripts/05_devices/stateless_update_stage/5_1_Update_Device_Stage_onclick_submit.deluge
 // Fields Used  : [Select_Devices, New_Device_Stage]
 // Cross-Forms  : [Devices]
-// Purpose      : Validates selected devices and target stage. Fetches device
-//                records in a single batch query and applies the target stage,
-//                harmonizing hardware-specific Stages 1 and 2 between Control
-//                Units and Overlays while applying shared stages uniformly.
-// Optimization : Single batch fetch [ID in dev_ids] prevents statement exhaustion.
-//                Safe and efficient for 100+ units in a single operation.
+// Purpose      : Thin UI wrapper calling handle_update_device_stage with
+//                try-catch error protection. Alerts only on error; redirects
+//                silently to All_Devices on success.
+// Optimization : Delegates batch processing to standalone function.
 // ==============================================================================
 
-// 1. Mandatory Input Validation
-is_valid = true;
-
-if(input.Select_Devices == null || input.Select_Devices.isEmpty())
+err = thisapp.handle_update_device_stage(input.Select_Devices, input.New_Device_Stage);
+if(err != "")
 {
-    alert "Please select at least one device to update.";
-    is_valid = false;
+    alert err;
 }
-else if(input.New_Device_Stage == null || input.New_Device_Stage == "")
+else
 {
-    alert "Please select the target stage in 'New Device Stage'.";
-    is_valid = false;
-}
-
-if(is_valid)
-{
-    // 2. Single Batch Query to retrieve all selected device records
-    dev_ids = input.Select_Devices;
-    selected_devs = Devices[ID in dev_ids];
-    
-    if(selected_devs.count() == 0)
-    {
-        alert "No matching device records found for the selected IDs.";
-    }
-    else
-    {
-        // 3. Guard against actively deployed devices before applying any updates
-        active_blocked = "";
-        for each dev_check in selected_devs
-        {
-            if(dev_check.Device_State == "Rentally Active" || dev_check.Device_State == "Active in Demo")
-            {
-                if(active_blocked != "")
-                {
-                    active_blocked = active_blocked + ", ";
-                }
-                active_blocked = active_blocked + dev_check.Serial_Number;
-            }
-        }
-        
-        if(active_blocked != "")
-        {
-            alert "Update Stage Blocked:\n\nActive deployed device(s) cannot change stage here: " + active_blocked + ".\nPlease use Close Deployments or Swap Devices first.";
-        }
-        else
-        {
-            // 4. Batch Update with Hardware Stage Harmonization for Stages 1 and 2
-            stg = input.New_Device_Stage;
-            updated_count = 0;
-            
-            for each dev in selected_devs
-            {
-                d_type = dev.Device_Type;
-                target_stg = stg;
-                
-                // Fallback detection from serial number if Device_Type is not populated
-                if(d_type == null || d_type == "")
-                {
-                    sn = dev.Serial_Number;
-                    if(sn != null && sn.contains("CU"))
-                    {
-                        d_type = "Control Unit";
-                    }
-                    else if(sn != null && sn.contains("OV"))
-                    {
-                        d_type = "Overlay";
-                    }
-                }
-                
-                // Convert only hardware-specific Stages 1 and 2 when mixed hardware is selected
-                if(d_type == "Overlay")
-                {
-                    if(stg == "1 - CU Enclosure Mfg in Progress")
-                    {
-                        target_stg = "1 - OV in Screen Printing / Welding";
-                    }
-                    else if(stg == "2 - CU Subsystems Assembled")
-                    {
-                        target_stg = "2 - OV in Stitching";
-                    }
-                }
-                else if(d_type == "Control Unit")
-                {
-                    if(stg == "1 - OV in Screen Printing / Welding")
-                    {
-                        target_stg = "1 - CU Enclosure Mfg in Progress";
-                    }
-                    else if(stg == "2 - OV in Stitching")
-                    {
-                        target_stg = "2 - CU Subsystems Assembled";
-                    }
-                }
-                
-                // Direct property update on fetched record
-                dev.Device_Stage = target_stg;
-                updated_count = updated_count + 1;
-            }
-            
-            // 5. User Feedback & View Refresh
-            alert "Successfully updated stage for " + updated_count + " device(s).";
-            openUrl("#Report:All_Devices", "same window");
-        }
-    }
+    openUrl("#Report:All_Devices", "same window");
 }

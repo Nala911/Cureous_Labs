@@ -5,29 +5,28 @@
 // File Path    : scripts/05_devices/form_devices/2_1_Devices_onuserinput_serialnumber.deluge
 // Fields Used  : [Serial_Number, Device_Type, Product_Model, Device_Stage, Device_State]
 // Cross-Forms  : [Devices, Product_Models]
-// Purpose      : Validates Serial Number syntax, checks for duplicates,
-//                auto-derives Device Type, resolves and sets Product Model lookup from Product_Models,
-//                sets initial Device Stage ("0 - Mfg Not Yet Started"),
-//                and sets initial Device State to "Available in Stock".
+// Purpose      : Sanitizes Serial Number, checks for duplicates, parses hardware
+//                type and model via shared parse_device_serial function, resolves
+//                Product Model lookup from Product_Models, sets initial Device Stage
+//                ("0 - Mfg Not Yet Started"), and sets Device State to "Available in Stock".
 // Optimization : Single indexed query for duplicate check, single indexed query for
 //                Product Model resolution. Runs in <10ms. Zero UI lag.
 // ==============================================================================
 
 if(input.Serial_Number != null && input.Serial_Number != "")
 {
-    raw_sn = input.Serial_Number.trim().toUpperCase();
-    
-    // 1. Fast Duplicate Guard: Check if Serial Number already exists
-    curr_id = 0;
-    if(input.ID != null)
+    p_res = thisapp.parse_device_serial(input.Serial_Number);
+    if(p_res.get("_error") != null && p_res.get("_error") != "")
     {
-        curr_id = input.ID;
+        alert p_res.get("_error").toString();
+        input.Device_Type = null;
+        input.Product_Model = null;
+        input.Device_Stage = null;
+        input.Device_State = null;
     }
-    
-    existing_devices = Devices[Serial_Number == raw_sn && ID != curr_id];
-    if(existing_devices.count() > 0)
+    else if(p_res.get("is_valid") != "true")
     {
-        alert "Device Already Registered:\n\nSerial Number '" + raw_sn + "' is already registered in the system.\n\nPlease enter or scan a unique serial number.";
+        alert "Invalid Serial Number:\n\n" + p_res.get("error").toString() + "\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
         input.Device_Type = null;
         input.Product_Model = null;
         input.Device_Stage = null;
@@ -35,13 +34,19 @@ if(input.Serial_Number != null && input.Serial_Number != "")
     }
     else
     {
-        // 2. Validate Device Type (Must contain CU or OV)
-        is_cu = raw_sn.contains("CU");
-        is_ov = raw_sn.contains("OV");
+        raw_sn = p_res.get("clean_sn").toString();
         
-        if(!is_cu && !is_ov)
+        // 1. Fast Duplicate Guard: Check if Serial Number already exists
+        curr_id = 0;
+        if(input.ID != null)
         {
-            alert "Unrecognized Device Type:\n\nSerial Number '" + raw_sn + "' must contain 'CU' (Control Unit) or 'OV' (Overlay).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
+            curr_id = input.ID;
+        }
+        
+        existing_devices = Devices[Serial_Number == raw_sn && ID != curr_id];
+        if(existing_devices.count() > 0)
+        {
+            alert "Device Already Registered:\n\nSerial Number '" + raw_sn + "' is already registered in the system.\n\nPlease enter or scan a unique serial number.";
             input.Device_Type = null;
             input.Product_Model = null;
             input.Device_Stage = null;
@@ -49,47 +54,20 @@ if(input.Serial_Number != null && input.Serial_Number != "")
         }
         else
         {
-            // 3. Validate Device Model Prefix and Determine Target Model Name
-            target_model_name = "";
-            if(raw_sn.startsWith("ALT"))
+            // 2. Set Derived Device Type & Auto-Initialize Unified Stage 0
+            input.Device_Type = p_res.get("device_type").toString();
+            input.Device_Stage = "0 - Mfg Not Yet Started";
+            
+            // 3. Assign Product Model Lookup ID Dynamically from Product_Models (User can edit/reassign)
+            target_model_name = p_res.get("model_name").toString();
+            input.Product_Model = null;
+            for each pm in Product_Models[Product_Model_Name == target_model_name]
             {
-                target_model_name = "Altern4";
-            }
-            else if(raw_sn.startsWith("ET"))
-            {
-                target_model_name = "Eturnal One";
+                input.Product_Model = pm.ID;
             }
             
-            if(target_model_name == "")
-            {
-                alert "Invalid Model Prefix:\n\nSerial Number '" + raw_sn + "' does not match any recognized Product Model prefix (ALT for Altern4, ET for Eturnal One).\n\nExamples: ALT4CU053, ALTOV017, ETOCU065, ETOOV064";
-                input.Product_Model = null;
-                input.Device_Stage = null;
-                input.Device_State = null;
-            }
-            else
-            {
-                // 4. Set Derived Device Type & Auto-Initialize Unified Stage 0
-                if(is_cu)
-                {
-                    input.Device_Type = "Control Unit";
-                }
-                else if(is_ov)
-                {
-                    input.Device_Type = "Overlay";
-                }
-                input.Device_Stage = "0 - Mfg Not Yet Started";
-                
-                // 5. Assign Product Model Lookup ID Dynamically from Product_Models (User can edit/reassign)
-                input.Product_Model = null;
-                for each pm in Product_Models[Product_Model_Name == target_model_name]
-                {
-                    input.Product_Model = pm.ID;
-                }
-                
-                // 6. Set Initial Device State
-                input.Device_State = "Available in Stock";
-            }
+            // 4. Set Initial Device State
+            input.Device_State = "Available in Stock";
         }
     }
 }

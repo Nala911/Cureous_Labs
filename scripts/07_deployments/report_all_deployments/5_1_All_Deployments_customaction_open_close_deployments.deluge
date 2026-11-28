@@ -13,23 +13,33 @@
 
 void open_close_deployments(Deployments selected_deployments)
 {
-    // 1. Keep only non-closed deployments from the selection
-    active_ids = list();
-    for each dep in selected_deployments
+    sel_count = 0;
+    try
     {
-        if(dep.Deployment_State != "Closed")
+        // 1. Keep only non-closed deployments from the selection
+        active_ids = list();
+        for each dep in selected_deployments
         {
-            active_ids.add(dep.ID);
+            sel_count = sel_count + 1;
+            if(dep.Deployment_State != "Closed")
+            {
+                active_ids.add(dep.ID);
+            }
+        }
+        
+        // 2. Guard against closing when zero active rows are selected
+        if(active_ids.size() == 0)
+        {
+            alert "Close Blocked: No active deployments selected. All selected deployment(s) are already Closed.";
+        }
+        else
+        {
+            openUrl("#Form:Close_Deployments?Deployments=" + active_ids, "popup window", "height=600px,width=700px");
         }
     }
-    
-    // 2. Guard against closing when zero active rows are selected
-    if(active_ids.size() == 0)
+    catch (e)
     {
-        alert "Close Blocked: No active deployments selected. All selected deployment(s) are already Closed.";
-    }
-    else
-    {
-        openUrl("#Form:Close_Deployments?Deployments=" + active_ids, "popup window", "height=600px,width=700px");
+        err_log = thisapp.format_error_log("open_close_deployments", "scripts/07_deployments/report_all_deployments/5_1_All_Deployments_customaction_open_close_deployments.deluge", "All_Deployments -> Close Deployments", "" + e.lineNo, "" + e.type, "" + e.message, "selected_count=" + sel_count);
+        alert err_log;
     }
 }

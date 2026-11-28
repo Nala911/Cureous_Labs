@@ -13,25 +13,36 @@
 
 void open_swap_devices(Deployments selected_deployments)
 {
-    // 1. Extract selected Deployment IDs
-    id_list = selected_deployments.ID.getAll();
-    
-    // 2. Ensure exactly one record is selected
-    if(id_list.size() != 1)
+    target_id_ctx = "None";
+    try
     {
-        alert "Please select exactly one active deployment to swap devices.";
-    }
-    else
-    {
-        target_id = id_list.get(0);
-        dep = Deployments[ID == target_id];
-        if(dep == null || dep.Deployment_State == "Closed")
+        // 1. Extract selected Deployment IDs
+        id_list = selected_deployments.ID.getAll();
+        target_id_ctx = "count=" + id_list.size();
+        
+        // 2. Ensure exactly one record is selected
+        if(id_list.size() != 1)
         {
-            alert "Swap Blocked: Closed deployments cannot be swapped. Please select an active deployment.";
+            alert "Please select exactly one active deployment to swap devices.";
         }
         else
         {
-            openUrl("#Form:Swap_Devices?Deployment=" + target_id, "popup window", "height=650px,width=700px");
+            target_id = id_list.get(0);
+            target_id_ctx = "Deployment_ID=" + target_id;
+            dep = Deployments[ID == target_id];
+            if(dep == null || dep.Deployment_State == "Closed")
+            {
+                alert "Swap Blocked: Closed deployments cannot be swapped. Please select an active deployment.";
+            }
+            else
+            {
+                openUrl("#Form:Swap_Devices?Deployment=" + target_id, "popup window", "height=650px,width=700px");
+            }
         }
+    }
+    catch (e)
+    {
+        err_log = thisapp.format_error_log("open_swap_devices", "scripts/07_deployments/report_all_deployments/5_2_All_Deployments_customaction_open_swap_devices.deluge", "All_Deployments -> Swap Devices", "" + e.lineNo, "" + e.type, "" + e.message, target_id_ctx);
+        alert err_log;
     }
 }

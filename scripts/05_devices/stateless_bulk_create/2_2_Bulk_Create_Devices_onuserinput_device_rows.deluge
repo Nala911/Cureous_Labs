@@ -1,0 +1,22 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Form Link Name: Bulk_Create_Devices)
+// Script Type  : Stateless Form Workflow (On User Input)
+// Trigger Hook : Field Actions -> Device_Rows -> On User Input
+// File Path    : scripts/05_devices/stateless_bulk_create/2_2_Bulk_Create_Devices_onuserinput_device_rows.deluge
+// Fields Used  : [Device_Rows, Reference_Guide]
+// Cross-Forms  : [Devices, Lots, Product_Models, Offices]
+// Purpose      : Re-validates edited Device_Rows tabular text in real time and
+//                refreshes Reference_Guide so corrected errors clear immediately
+//                and any newly introduced row issues are highlighted.
+// Optimization : Delegates to validate_bulk_device_rows (1 batch DB check).
+// ==============================================================================
+
+val_res = thisapp.validate_bulk_device_rows(input.Device_Rows, "");
+if(val_res.get("_error") != null && val_res.get("_error") != "")
+{
+    alert val_res.get("_error").toString();
+}
+else
+{
+    input.Reference_Guide = val_res.get("reference_text").toString();
+}

@@ -47,9 +47,14 @@ if(input.Overlay != null)
                 alert "Not Ready for Swap: Overlay " + ov_dev.Serial_Number + " is at stage '" + ov_dev.Device_Stage + "' (requires '6 - Ready Condition').";
                 input.Overlay = src_ov;
             }
-            else if(ov_dev.Device_State != "Available in Stock")
+            else if(ov_dev.Device_State != "Available in Stock" && ov_dev.Device_State != "Idle with Customer")
             {
-                alert "Device Unavailable: Overlay " + ov_dev.Serial_Number + " is currently '" + ov_dev.Device_State + "' (requires 'Available in Stock').";
+                alert "Device Unavailable: Overlay " + ov_dev.Serial_Number + " is currently '" + ov_dev.Device_State + "' (requires 'Available in Stock' or 'Idle with Customer').";
+                input.Overlay = src_ov;
+            }
+            else if(ov_dev.Device_State == "Idle with Customer" && src_dep != null && ov_dev.Current_Customer != null && ov_dev.Current_Customer != src_dep.Customer)
+            {
+                alert "Custody Mismatch: Overlay " + ov_dev.Serial_Number + " is currently 'Idle with Customer' at a different customer site.";
                 input.Overlay = src_ov;
             }
             else

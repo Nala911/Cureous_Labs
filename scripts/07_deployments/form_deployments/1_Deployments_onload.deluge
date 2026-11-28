@@ -3,35 +3,86 @@
 // Script Type  : Form Workflow (On Load)
 // Trigger Hook : Created or Edited -> Form Actions -> On Load
 // File Path    : scripts/07_deployments/form_deployments/1_Deployments_onload.deluge
-// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay, Deployment_State, Deployment_Summary]
+// Fields Used  : [Start_Date, End_Date, Customer, Control_Unit, Overlay,
+//                 Deployment_State, Deployment_Summary, Billing_Mode, Rental_Rate,
+//                 GST_Amount, Invoice_Amount, Billing_Day, Next_Billing_From,
+//                 Next_Billing_To, Next_Billing_Period, Last_Billed_Period,
+//                 Return_Report, Launch_Alert]
 // Cross-Forms  : [Devices]
-// Purpose      : Initializes default values in Add mode (Start_Date to today,
-//                Deployment_State choices restricted to Rental/Demo with Rental
-//                as default, End_Date hidden, Control_Unit and Overlay lookups
-//                dynamically filtered to Ready Condition & Available in Stock).
-//                In Edit mode, locks closed audit records or locks Control_Unit
-//                and Overlay and limits Deployment_State to active states
-//                (Rental/Demo/Idle) so swaps and closures flow through wizards.
+// Purpose      : Initializes Add/Edit UI state, filters ready devices in Add
+//                mode while preserving URL pre-fills, displays launch alerts,
+//                enforces audit locks on Closed records, and controls
+//                visibility/locking of Fixed Monthly & Pay Per Use billing fields.
 // Optimization : Two indexed list queries in Add mode only. Runs in <15ms.
 // ==============================================================================
 
+// Always hide internal system/anchor fields and lock computed outputs
+hide Deployment_Summary;
+hide Billing_Day;
+hide Next_Billing_From;
+hide Next_Billing_To;
+hide Return_Report;
+hide Launch_Alert;
+
+if(input.Launch_Alert != null && input.Launch_Alert != "")
+{
+    launch_code = input.Launch_Alert;
+    input.Launch_Alert = null;
+    if(launch_code == "NONE_SELECTED")
+    {
+        alert "No devices were selected. You can select ready devices manually below.";
+    }
+    else if(launch_code == "TOO_MANY")
+    {
+        alert "Selection Limit: Please select at most 2 devices (1 Control Unit and 1 Overlay) in All Devices, or select devices manually below.";
+    }
+    else if(launch_code == "ALREADY_ACTIVE")
+    {
+        alert "Selection Blocked: One or more selected devices are already 'Rentally Active' or 'Active in Demo'. Please close or swap their active deployment first.";
+    }
+    else if(launch_code == "NOT_READY")
+    {
+        alert "Not Ready: One or more selected devices are not at '6 - Ready Condition'. Update their stage to '6 - Ready Condition' first.";
+    }
+    else if(launch_code == "TWO_CU")
+    {
+        alert "Invalid Pair: You selected 2 Control Units. A deployment accepts at most 1 Control Unit and 1 Overlay.";
+    }
+    else if(launch_code == "TWO_OV")
+    {
+        alert "Invalid Pair: You selected 2 Overlays. A deployment accepts at most 1 Control Unit and 1 Overlay.";
+    }
+    else if(launch_code == "CUSTODY_MISMATCH")
+    {
+        alert "Custody Mismatch: Selected devices are 'Idle with Customer' at two different customer sites. Please match customer custody first.";
+    }
+}
+
+disable GST_Amount;
+disable Invoice_Amount;
+disable Next_Billing_Period;
+disable Last_Billed_Period;
+
 if(input.ID == null)
 {
-    // 1. ADD Mode: Enable interactive deployment fields and hide End_Date
+    // 1. ADD Mode: Enable interactive deployment fields and hide End_Date / Last_Billed_Period
     enable Customer;
     enable Control_Unit;
     enable Overlay;
     enable Start_Date;
     enable Deployment_State;
+    enable Billing_Mode;
     
     show Customer;
     show Control_Unit;
     show Overlay;
     show Start_Date;
     show Deployment_State;
+    show Billing_Mode;
+    show Next_Billing_Period;
     
     hide End_Date;
-    hide Deployment_Summary;
+    hide Last_Billed_Period;
     
     // Auto-populate Start Date with today's date if empty
     if(input.Start_Date == null)
@@ -51,24 +102,67 @@ if(input.ID == null)
         input.Deployment_State = "Rental";
     }
     
-    // Filter Control Unit & Overlay options to Ready Condition & Available in Stock only
-    ready_cu_ids = Devices[Device_Type == "Control Unit" && Device_Stage == "6 - Ready Condition" && Device_State == "Available in Stock"].ID.getAll();
+    // Toggle Fixed Monthly rate fields
+    if(input.Deployment_State == "Rental" && input.Billing_Mode == "Fixed Monthly")
+    {
+        show Rental_Rate;
+        enable Rental_Rate;
+        show GST_Amount;
+        show Invoice_Amount;
+    }
+    else
+    {
+        hide Rental_Rate;
+        hide GST_Amount;
+        hide Invoice_Amount;
+    }
+    
+    // Pre-compute initial billing period preview if Billing_Mode is already chosen
+    if(input.Deployment_State == "Rental" && input.Billing_Mode != null && input.Billing_Mode != "" && input.Start_Date != null)
+    {
+        anchor_day = input.Start_Date.getDay();
+        cycle = thisapp.compute_billing_period(input.Start_Date, input.Billing_Mode, anchor_day);
+        if(cycle.containKey("_error"))
+        {
+            alert cycle.get("_error");
+        }
+        else if(cycle.containKey("label"))
+        {
+            input.Billing_Day = anchor_day;
+            input.Next_Billing_From = cycle.get("from");
+            input.Next_Billing_To = cycle.get("to");
+            input.Next_Billing_Period = cycle.get("label");
+        }
+    }
+    
+    // Filter Control Unit & Overlay options to Ready Condition & Available in Stock / Idle with Customer, preserving URL pre-fills
+    pre_cu = input.Control_Unit;
+    pre_ov = input.Overlay;
+    
+    ready_cu_ids = Devices[Device_Type == "Control Unit" && Device_Stage == "6 - Ready Condition" && (Device_State == "Available in Stock" || Device_State == "Idle with Customer")].ID.getAll();
     clear Control_Unit;
     if(ready_cu_ids.size() > 0)
     {
         Control_Unit:ui.add(ready_cu_ids);
     }
+    if(pre_cu != null && ready_cu_ids.contains(pre_cu))
+    {
+        input.Control_Unit = pre_cu;
+    }
     
-    ready_ov_ids = Devices[Device_Type == "Overlay" && Device_Stage == "6 - Ready Condition" && Device_State == "Available in Stock"].ID.getAll();
+    ready_ov_ids = Devices[Device_Type == "Overlay" && Device_Stage == "6 - Ready Condition" && (Device_State == "Available in Stock" || Device_State == "Idle with Customer")].ID.getAll();
     clear Overlay;
     if(ready_ov_ids.size() > 0)
     {
         Overlay:ui.add(ready_ov_ids);
     }
+    if(pre_ov != null && ready_ov_ids.contains(pre_ov))
+    {
+        input.Overlay = pre_ov;
+    }
 }
 else
 {
-    hide Deployment_Summary;
     // 2. EDIT Mode: Audit lock if deployment is already closed
     if(input.Deployment_State == "Closed")
     {
@@ -79,6 +173,48 @@ else
         disable Start_Date;
         disable End_Date;
         disable Deployment_State;
+        disable Billing_Mode;
+        disable Rental_Rate;
+        
+        if(input.Billing_Mode != null && input.Billing_Mode != "")
+        {
+            show Billing_Mode;
+        }
+        else
+        {
+            hide Billing_Mode;
+        }
+        
+        if(input.Billing_Mode == "Fixed Monthly")
+        {
+            show Rental_Rate;
+            show GST_Amount;
+            show Invoice_Amount;
+        }
+        else
+        {
+            hide Rental_Rate;
+            hide GST_Amount;
+            hide Invoice_Amount;
+        }
+        
+        if(input.Next_Billing_Period != null && input.Next_Billing_Period != "")
+        {
+            show Next_Billing_Period;
+        }
+        else
+        {
+            hide Next_Billing_Period;
+        }
+        
+        if(input.Last_Billed_Period != null && input.Last_Billed_Period != "")
+        {
+            show Last_Billed_Period;
+        }
+        else
+        {
+            hide Last_Billed_Period;
+        }
     }
     else
     {
@@ -98,7 +234,6 @@ else
         else
         {
             hide End_Date;
-    hide Deployment_Summary;
         }
         
         // Expose active lifecycle choices in Edit mode (closures flow through Close_Deployments)
@@ -113,6 +248,52 @@ else
         if(current_state != null && current_state != "")
         {
             input.Deployment_State = current_state;
+        }
+        
+        has_billed = (input.Last_Billed_Period != null && input.Last_Billed_Period != "");
+        if(has_billed)
+        {
+            show Last_Billed_Period;
+        }
+        else
+        {
+            hide Last_Billed_Period;
+        }
+        
+        if(current_state == "Rental")
+        {
+            show Billing_Mode;
+            if(has_billed)
+            {
+                disable Billing_Mode;
+            }
+            else
+            {
+                enable Billing_Mode;
+            }
+            show Next_Billing_Period;
+            
+            if(input.Billing_Mode == "Fixed Monthly")
+            {
+                show Rental_Rate;
+                enable Rental_Rate;
+                show GST_Amount;
+                show Invoice_Amount;
+            }
+            else
+            {
+                hide Rental_Rate;
+                hide GST_Amount;
+                hide Invoice_Amount;
+            }
+        }
+        else
+        {
+            hide Billing_Mode;
+            hide Rental_Rate;
+            hide GST_Amount;
+            hide Invoice_Amount;
+            hide Next_Billing_Period;
         }
     }
 }

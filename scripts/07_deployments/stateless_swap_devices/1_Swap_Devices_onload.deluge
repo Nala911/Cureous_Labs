@@ -79,6 +79,18 @@ if(pre_dep_id != null)
                 cu_choices.add(rcu);
             }
         }
+        if(dep.Customer != null)
+        {
+            old_cust = dep.Customer;
+            cust_cu_ids = Devices[Device_Type == "Control Unit" && Device_Stage == "6 - Ready Condition" && Device_State == "Idle with Customer" && Current_Customer == old_cust].ID.getAll();
+            for each ccu in cust_cu_ids
+            {
+                if(!cu_choices.contains(ccu))
+                {
+                    cu_choices.add(ccu);
+                }
+            }
+        }
         clear Control_Unit;
         if(cu_choices.size() > 0)
         {
@@ -95,6 +107,18 @@ if(pre_dep_id != null)
             if(!ov_choices.contains(rov))
             {
                 ov_choices.add(rov);
+            }
+        }
+        if(dep.Customer != null)
+        {
+            old_cust = dep.Customer;
+            cust_ov_ids = Devices[Device_Type == "Overlay" && Device_Stage == "6 - Ready Condition" && Device_State == "Idle with Customer" && Current_Customer == old_cust].ID.getAll();
+            for each cov in cust_ov_ids
+            {
+                if(!ov_choices.contains(cov))
+                {
+                    ov_choices.add(cov);
+                }
             }
         }
         clear Overlay;

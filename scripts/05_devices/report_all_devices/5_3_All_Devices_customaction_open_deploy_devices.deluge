@@ -1,0 +1,119 @@
+// ==============================================================================
+// Module Name  : Devices (Report Link Name: All_Devices)
+// Script Type  : Report Custom Action Function (Workflow Action Item)
+// Trigger Hook : Report Actions -> For Multiple Records -> Deploy Devices
+// File Path    : scripts/05_devices/report_all_devices/5_3_All_Devices_customaction_open_deploy_devices.deluge
+// Fields Used  : [ID, Device_Type, Device_Stage, Device_State, Current_Customer]
+// Cross-Forms  : [Deployments]
+// Purpose      : Validates 1 or 2 selected ready devices (at most 1 Control Unit
+//                and 1 Overlay, matching Idle with Customer custody if any) and
+//                opens Deployments in a pre-filled popup modal with
+//                Return_Report=All_Devices so Submit refreshes All_Devices.
+// Optimization : Reads directly from selected_devices collection. Zero queries.
+// ==============================================================================
+
+void open_deploy_devices(Devices selected_devices)
+{
+    total_count = 0;
+    try
+    {
+        // 1. Inspect selected rows for pairing, readiness, state, and custody
+        cu_ids = list();
+        ov_ids = list();
+        not_ready_count = 0;
+        active_count = 0;
+        idle_customers = list();
+        
+        for each dev in selected_devices
+        {
+            total_count = total_count + 1;
+            if(dev.Device_State == "Rentally Active" || dev.Device_State == "Active in Demo")
+            {
+                active_count = active_count + 1;
+            }
+            else if(dev.Device_Stage != "6 - Ready Condition")
+            {
+                not_ready_count = not_ready_count + 1;
+            }
+            else
+            {
+                if(dev.Device_Type == "Control Unit")
+                {
+                    cu_ids.add(dev.ID);
+                }
+                else if(dev.Device_Type == "Overlay")
+                {
+                    ov_ids.add(dev.ID);
+                }
+                if(dev.Device_State == "Idle with Customer" && dev.Current_Customer != null)
+                {
+                    c_id = dev.Current_Customer;
+                    if(!idle_customers.contains(c_id))
+                    {
+                        idle_customers.add(c_id);
+                    }
+                }
+            }
+        }
+        
+        // 2. Determine validation error code (handled via alert in Deployments On Load)
+        err_code = "";
+        if(total_count == 0)
+        {
+            err_code = "NONE_SELECTED";
+        }
+        else if(total_count > 2)
+        {
+            err_code = "TOO_MANY";
+        }
+        else if(active_count > 0)
+        {
+            err_code = "ALREADY_ACTIVE";
+        }
+        else if(not_ready_count > 0)
+        {
+            err_code = "NOT_READY";
+        }
+        else if(cu_ids.size() > 1)
+        {
+            err_code = "TWO_CU";
+        }
+        else if(ov_ids.size() > 1)
+        {
+            err_code = "TWO_OV";
+        }
+        else if(idle_customers.size() > 1)
+        {
+            err_code = "CUSTODY_MISMATCH";
+        }
+        
+        // 3. Launch Deployments popup with Return_Report=All_Devices & pre-fills
+        url_params = "Return_Report=All_Devices";
+        if(err_code != "")
+        {
+            url_params = url_params + "&Launch_Alert=" + err_code;
+        }
+        else
+        {
+            if(cu_ids.size() == 1)
+            {
+                url_params = url_params + "&Control_Unit=" + cu_ids.get(0);
+            }
+            if(ov_ids.size() == 1)
+            {
+                url_params = url_params + "&Overlay=" + ov_ids.get(0);
+            }
+            if(idle_customers.size() == 1)
+            {
+                url_params = url_params + "&Customer=" + idle_customers.get(0);
+            }
+        }
+        
+        openUrl("#Form:Deployments?" + url_params, "popup window", "height=720px,width=820px");
+    }
+    catch (e)
+    {
+        err_log = thisapp.format_error_log("open_deploy_devices", "scripts/05_devices/report_all_devices/5_3_All_Devices_customaction_open_deploy_devices.deluge", "All_Devices -> Deploy Devices", "" + e.lineNo, "" + e.type, "" + e.message, "selected_count=" + total_count);
+        alert err_log;
+    }
+}

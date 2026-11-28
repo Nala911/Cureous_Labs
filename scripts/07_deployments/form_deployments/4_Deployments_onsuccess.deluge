@@ -3,82 +3,25 @@
 // Script Type  : Form Workflow (On Success)
 // Trigger Hook : Created or Edited -> Form Actions -> On Success
 // File Path    : scripts/07_deployments/form_deployments/4_Deployments_onsuccess.deluge
-// Fields Used  : [Deployment_State, Customer, Control_Unit, Overlay]
+// Fields Used  : [Deployment_State, Customer, Control_Unit, Overlay, Return_Report]
 // Cross-Forms  : [Devices]
-// Purpose      : Synchronizes physical asset master records in Devices. Maps
-//                Deployment_State to Devices.Device_State, assigns or clears
-//                Devices.Current_Customer, and clears Devices.Current_Office
-//                when deployed to a customer.
-// Optimization : Targeted direct record updates by PK. Zero statement waste.
+// Purpose      : Synchronizes physical asset master records in Devices via
+//                sync_deployment_devices (try-catch protected), alerts only on
+//                error, and returns cleanly to All_Devices or All_Deployments.
+// Optimization : Delegates updates to standalone function.
 // ==============================================================================
 
-// 1. Determine target device state, customer allocation, and office clearing
-target_state = "Available in Stock";
-target_cust = null;
-clear_office = false;
-
-if(input.Deployment_State == "Rental")
+err = thisapp.sync_deployment_devices(input.Deployment_State, input.Customer, input.Control_Unit, input.Overlay);
+if(err != "")
 {
-    target_state = "Rentally Active";
-    target_cust = input.Customer;
-    clear_office = true;
-}
-else if(input.Deployment_State == "Demo")
-{
-    target_state = "Active in Demo";
-    target_cust = input.Customer;
-    clear_office = true;
-}
-else if(input.Deployment_State == "Idle")
-{
-    target_state = "Idle with Customer";
-    target_cust = input.Customer;
-    clear_office = true;
-}
-else if(input.Deployment_State == "Closed")
-{
-    target_state = "Available in Stock";
-    target_cust = null;
-    clear_office = false;
+    alert err;
 }
 
-// 2. Synchronize Control Unit asset master record
-if(input.Control_Unit != null)
+if(input.Return_Report == "All_Devices")
 {
-    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
-    target_cu = input.Control_Unit;
-    cu_dev = Devices[ID == target_cu];
-    
-    if(cu_dev != null)
-    {
-        // Direct record update (Law 3)
-        cu_dev.Device_State = target_state;
-        cu_dev.Current_Customer = target_cust;
-        if(clear_office)
-        {
-            cu_dev.Current_Office = null;
-        }
-    }
+    openUrl("#Report:All_Devices", "parent window");
 }
-
-// 3. Synchronize Overlay mattress asset master record
-if(input.Overlay != null)
+else
 {
-    // Pre-assign variable for Criteria Bracket Integrity (Law 1)
-    target_ov = input.Overlay;
-    ov_dev = Devices[ID == target_ov];
-    
-    if(ov_dev != null)
-    {
-        // Direct record update (Law 3)
-        ov_dev.Device_State = target_state;
-        ov_dev.Current_Customer = target_cust;
-        if(clear_office)
-        {
-            ov_dev.Current_Office = null;
-        }
-    }
+    openUrl("#Report:All_Deployments", "same window");
 }
-
-// 4. Return user cleanly to the Deployments report view
-openUrl("#Report:All_Deployments", "same window");

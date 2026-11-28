@@ -1,0 +1,82 @@
+// ==============================================================================
+// Module Name  : Deployments (Sync Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Deployments -> Form Actions -> On Success
+// File Path    : scripts/functions/sync_deployment_devices.deluge
+// Fields Used  : [Deployment_State, Customer, Control_Unit, Overlay]
+// Cross-Forms  : [Devices]
+// Purpose      : Synchronizes physical Control Unit and Overlay records in
+//                Devices based on Deployment_State inside a try-catch block,
+//                returning a formatted error log if any update fails.
+// Optimization : Targeted direct record updates by PK.
+// ==============================================================================
+
+string sync_deployment_devices(string deployment_state, int customer_id, int control_unit_id, int overlay_id)
+{
+    err_msg = "";
+    try
+    {
+        target_state = "Available in Stock";
+        target_cust = null;
+        clear_office = false;
+        
+        if(deployment_state == "Rental")
+        {
+            target_state = "Rentally Active";
+            target_cust = customer_id;
+            clear_office = true;
+        }
+        else if(deployment_state == "Demo")
+        {
+            target_state = "Active in Demo";
+            target_cust = customer_id;
+            clear_office = true;
+        }
+        else if(deployment_state == "Idle")
+        {
+            target_state = "Idle with Customer";
+            target_cust = customer_id;
+            clear_office = true;
+        }
+        else if(deployment_state == "Closed")
+        {
+            target_state = "Available in Stock";
+            target_cust = null;
+            clear_office = false;
+        }
+        
+        if(control_unit_id != null)
+        {
+            cu_dev = Devices[ID == control_unit_id];
+            if(cu_dev != null)
+            {
+                cu_dev.Device_State = target_state;
+                cu_dev.Current_Customer = target_cust;
+                if(clear_office)
+                {
+                    cu_dev.Current_Office = null;
+                }
+            }
+        }
+        
+        if(overlay_id != null)
+        {
+            ov_dev = Devices[ID == overlay_id];
+            if(ov_dev != null)
+            {
+                ov_dev.Device_State = target_state;
+                ov_dev.Current_Customer = target_cust;
+                if(clear_office)
+                {
+                    ov_dev.Current_Office = null;
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        ctx = "Deployment_State=" + deployment_state + " | Customer=" + customer_id + " | Control_Unit=" + control_unit_id + " | Overlay=" + overlay_id;
+        err_msg = thisapp.format_error_log("sync_deployment_devices", "scripts/functions/sync_deployment_devices.deluge", "Deployments -> Form Actions -> On Success", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+    }
+    return err_msg;
+}

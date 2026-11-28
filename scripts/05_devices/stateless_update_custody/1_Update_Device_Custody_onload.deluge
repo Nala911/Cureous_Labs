@@ -3,33 +3,20 @@
 // Script Type  : Stateless Form Workflow (On Load)
 // Trigger Hook : Form Actions -> On Load
 // File Path    : scripts/05_devices/stateless_update_custody/1_Update_Device_Custody_onload.deluge
-// Fields Used  : [Select_Devices, Destination_Type, Target_Office, Target_Customer]
+// Fields Used  : [Select_Devices, Target_Office, Target_Customer]
 // Cross-Forms  : [Devices]
-// Purpose      : Hides Target_Office and Target_Customer by default until a
-//                Destination_Type is chosen, and dynamically filters Select_Devices
-//                via Deluge to exclude actively deployed devices while preserving
-//                eligible URL pre-fills.
+// Purpose      : Displays both Target_Office and Target_Customer side-by-side
+//                for 1-click destination selection, and dynamically filters
+//                Select_Devices via Deluge to exclude actively deployed devices
+//                while preserving eligible URL pre-fills.
 // Optimization : Single indexed list query on Devices. Runs in <10ms.
 // ==============================================================================
 
-// 1. Dynamic Destination Field Visibility
-if(input.Destination_Type == "Internal Office Transfer")
-{
-    show Target_Office;
-    enable Target_Office;
-    hide Target_Customer;
-}
-else if(input.Destination_Type == "Customer Deployment")
-{
-    show Target_Customer;
-    enable Target_Customer;
-    hide Target_Office;
-}
-else
-{
-    hide Target_Office;
-    hide Target_Customer;
-}
+// 1. Ensure Both Destination Lookups Are Visible & Enabled
+show Target_Office;
+enable Target_Office;
+show Target_Customer;
+enable Target_Customer;
 
 // 2. Dynamic Deluge Filter: Exclude actively deployed devices
 pre_selected = input.Select_Devices;

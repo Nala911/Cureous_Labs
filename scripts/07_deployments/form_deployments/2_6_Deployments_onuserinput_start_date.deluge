@@ -1,0 +1,41 @@
+// ==============================================================================
+// Module Name  : Deployments (Form Link Name: Deployments)
+// Script Type  : Form Workflow (On User Input)
+// Trigger Hook : Created or Edited -> Field Actions -> Start_Date -> On User Input
+// File Path    : scripts/07_deployments/form_deployments/2_6_Deployments_onuserinput_start_date.deluge
+// Fields Used  : [Start_Date, Deployment_State, Billing_Mode, Billing_Day,
+//                 Next_Billing_From, Next_Billing_To, Next_Billing_Period,
+//                 Last_Billed_Period]
+// Cross-Forms  : None
+// Purpose      : Recomputes the initial billing cycle and anchor day when
+//                Start_Date is entered or modified prior to the first billed cycle.
+// Optimization : Zero database queries. Runs in <1ms.
+// ==============================================================================
+
+has_billed = (input.Last_Billed_Period != null && input.Last_Billed_Period != "");
+if(input.Deployment_State == "Rental" && !has_billed)
+{
+    if(input.Start_Date != null && input.Billing_Mode != null && input.Billing_Mode != "")
+    {
+        anchor_day = input.Start_Date.getDay();
+        cycle = thisapp.compute_billing_period(input.Start_Date, input.Billing_Mode, anchor_day);
+        if(cycle.containKey("_error"))
+        {
+            alert cycle.get("_error");
+        }
+        else if(cycle.containKey("label"))
+        {
+            input.Billing_Day = anchor_day;
+            input.Next_Billing_From = cycle.get("from");
+            input.Next_Billing_To = cycle.get("to");
+            input.Next_Billing_Period = cycle.get("label");
+        }
+    }
+    else
+    {
+        input.Billing_Day = null;
+        input.Next_Billing_From = null;
+        input.Next_Billing_To = null;
+        input.Next_Billing_Period = null;
+    }
+}

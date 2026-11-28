@@ -1,0 +1,126 @@
+// ==============================================================================
+// Module Name  : Update Device Custody (Action Handler Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Update_Device_Custody -> Submit -> On Click
+// File Path    : scripts/functions/handle_update_device_custody.deluge
+// Fields Used  : [Select_Devices, Target_Office, Target_Customer]
+// Cross-Forms  : [Devices, Deployments]
+// Purpose      : Validates selected devices and mutual-exclusion destination,
+//                blocks active deployments and non-ready customer transfers, and
+//                batch-updates Devices custody & Device_State inside try-catch.
+// Optimization : Two batch queries ([ID in dev_ids] and open Deployments check)
+//                prevent statement exhaustion even on 100+ selected devices.
+// ==============================================================================
+
+string handle_update_device_custody(list select_devices, int target_office, int target_customer)
+{
+    err_msg = "";
+    try
+    {
+        if(select_devices == null || select_devices.isEmpty())
+        {
+            err_msg = "Please select at least one device to transfer custody.";
+        }
+        else if(target_office == null && target_customer == null)
+        {
+            err_msg = "Please select either a Target Office or a Target Customer.";
+        }
+        else if(target_office != null && target_customer != null)
+        {
+            err_msg = "Please select only one destination (either Target Office or Target Customer, not both).";
+        }
+        else
+        {
+            selected_devs = Devices[ID in select_devices];
+            if(selected_devs.count() == 0)
+            {
+                err_msg = "No matching device records found for the selected IDs.";
+            }
+            else
+            {
+                is_customer_transfer = (target_customer != null);
+                active_blocked = "";
+                not_ready_blocked = "";
+                
+                open_deps = Deployments[(Control_Unit in select_devices || Overlay in select_devices) && Deployment_State != "Closed"];
+                open_dep_dev_ids = list();
+                for each dep in open_deps
+                {
+                    if(dep.Control_Unit != null)
+                    {
+                        dep_cu = dep.Control_Unit;
+                        if(!open_dep_dev_ids.contains(dep_cu))
+                        {
+                            open_dep_dev_ids.add(dep_cu);
+                        }
+                    }
+                    if(dep.Overlay != null)
+                    {
+                        dep_ov = dep.Overlay;
+                        if(!open_dep_dev_ids.contains(dep_ov))
+                        {
+                            open_dep_dev_ids.add(dep_ov);
+                        }
+                    }
+                }
+                
+                for each dev_check in selected_devs
+                {
+                    chk_id = dev_check.ID;
+                    if(dev_check.Device_State == "Rentally Active" || dev_check.Device_State == "Active in Demo" || open_dep_dev_ids.contains(chk_id))
+                    {
+                        if(active_blocked != "")
+                        {
+                            active_blocked = active_blocked + ", ";
+                        }
+                        active_blocked = active_blocked + dev_check.Serial_Number;
+                    }
+                    else if(is_customer_transfer && dev_check.Device_Stage != "6 - Ready Condition")
+                    {
+                        if(not_ready_blocked != "")
+                        {
+                            not_ready_blocked = not_ready_blocked + ", ";
+                        }
+                        not_ready_blocked = not_ready_blocked + dev_check.Serial_Number;
+                    }
+                }
+                
+                if(active_blocked != "")
+                {
+                    err_msg = "Update Custody Blocked:\n\nDevice(s) currently linked to an active deployment: " + active_blocked + ".\nPlease use Close Deployments or Swap Devices first.";
+                }
+                else if(not_ready_blocked != "")
+                {
+                    err_msg = "Customer Transfer Blocked:\n\nDevice(s) not at '6 - Ready Condition': " + not_ready_blocked + ".";
+                }
+                else
+                {
+                    if(!is_customer_transfer)
+                    {
+                        for each dev in selected_devs
+                        {
+                            dev.Current_Office = target_office;
+                            dev.Current_Customer = null;
+                            dev.Device_State = "Available in Stock";
+                        }
+                    }
+                    else
+                    {
+                        for each dev in selected_devs
+                        {
+                            dev.Current_Customer = target_customer;
+                            dev.Current_Office = null;
+                            dev.Device_State = "Idle with Customer";
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        ctx = "Select_Devices=" + select_devices + " | Target_Office=" + target_office + " | Target_Customer=" + target_customer;
+        err_msg = thisapp.format_error_log("handle_update_device_custody", "scripts/functions/handle_update_device_custody.deluge", "Update_Device_Custody -> Submit -> On Click", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+    }
+    return err_msg;
+}

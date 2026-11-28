@@ -1,0 +1,22 @@
+// ==============================================================================
+// Module Name  : Mark Deployments Billed (Form Link Name: Mark_Deployments_Billed)
+// Script Type  : Stateless Form Action (On Click of Submit)
+// Trigger Hook : Form Actions -> Submit Button -> On Click
+// File Path    : scripts/07_deployments/stateless_mark_billed/5_1_Mark_Deployments_Billed_onclick_submit.deluge
+// Fields Used  : [Deployments, Billing_Action]
+// Cross-Forms  : [Deployments]
+// Purpose      : Thin UI wrapper calling handle_mark_deployments_billed with
+//                try-catch error protection. Alerts only on error; redirects
+//                silently to All_Deployments on success.
+// Optimization : Delegates batch processing to standalone function.
+// ==============================================================================
+
+err = thisapp.handle_mark_deployments_billed(input.Deployments, input.Billing_Action);
+if(err != "")
+{
+    alert err;
+}
+else
+{
+    openUrl("#Report:All_Deployments", "same window");
+}

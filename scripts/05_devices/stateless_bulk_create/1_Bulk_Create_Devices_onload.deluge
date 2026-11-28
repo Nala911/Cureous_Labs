@@ -1,0 +1,24 @@
+// ==============================================================================
+// Module Name  : Bulk Create Devices (Form Link Name: Bulk_Create_Devices)
+// Script Type  : Stateless Form Workflow (On Load)
+// Trigger Hook : Form Actions -> On Load
+// File Path    : scripts/05_devices/stateless_bulk_create/1_Bulk_Create_Devices_onload.deluge
+// Fields Used  : [Device_Rows, Reference_Guide]
+// Cross-Forms  : [Lots, Product_Models, Offices]
+// Purpose      : Locks Reference_Guide as read-only and populates valid Lots,
+//                Product_Models, Offices, and Device Stages along with the
+//                Device_Rows header template via generate_bulk_device_rows.
+// Optimization : Delegates all master list fetches to generate_bulk_device_rows.
+// ==============================================================================
+
+disable Reference_Guide;
+gen_res = thisapp.generate_bulk_device_rows("");
+if(gen_res.get("_error") != null && gen_res.get("_error") != "")
+{
+    alert gen_res.get("_error").toString();
+}
+else
+{
+    input.Device_Rows = gen_res.get("device_rows_text").toString();
+    input.Reference_Guide = gen_res.get("reference_text").toString();
+}

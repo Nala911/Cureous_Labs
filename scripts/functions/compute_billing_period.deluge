@@ -1,0 +1,63 @@
+// ==============================================================================
+// Module Name  : Deployments (Shared Utility Function)
+// Script Type  : Standalone Deluge Function (Namespace: Default)
+// Trigger Hook : Called by Deployments form workflows, Swap_Devices, and advance_billing_period
+// File Path    : scripts/functions/compute_billing_period.deluge
+// Fields Used  : None
+// Cross-Forms  : [Deployments, Swap_Devices]
+// Purpose      : Computes billing cycle start/end dates and formatted period label
+//                ("dd MMM yy - dd MMM yy") for Pay Per Use (period_start to
+//                calendar month-end) and Fixed Monthly (period_start to next
+//                anchored billing day minus 1 day, clamped to month length).
+// Optimization : Pure in-memory date arithmetic. Zero database queries.
+// ==============================================================================
+
+map compute_billing_period(date period_start, string billing_mode, int anchor_day)
+{
+    result = map();
+    try
+    {
+        if(period_start == null || billing_mode == null || billing_mode == "")
+        {
+            return result;
+        }
+        
+        curr_first = period_start.subDay(period_start.getDay() - 1);
+        period_to = period_start;
+        
+        if(billing_mode == "Pay Per Use")
+        {
+            period_to = curr_first.addMonth(1).subDay(1);
+        }
+        else if(billing_mode == "Fixed Monthly")
+        {
+            eff_anchor = anchor_day;
+            if(eff_anchor == null || eff_anchor < 1)
+            {
+                eff_anchor = period_start.getDay();
+            }
+            next_first = curr_first.addMonth(1);
+            next_last = next_first.addMonth(1).subDay(1);
+            max_day = next_last.getDay();
+            target_day = eff_anchor;
+            if(target_day > max_day)
+            {
+                target_day = max_day;
+            }
+            next_anchor = next_first.addDay(target_day - 1);
+            period_to = next_anchor.subDay(1);
+        }
+        
+        period_label = period_start.toString("dd MMM yy") + " - " + period_to.toString("dd MMM yy");
+        result.put("from", period_start);
+        result.put("to", period_to);
+        result.put("label", period_label);
+    }
+    catch (e)
+    {
+        ctx = "period_start=" + period_start + " | billing_mode=" + billing_mode + " | anchor_day=" + anchor_day;
+        err_log = thisapp.format_error_log("compute_billing_period", "scripts/functions/compute_billing_period.deluge", "Shared Utility Function", "" + e.lineNo, "" + e.type, "" + e.message, ctx);
+        result.put("_error", err_log);
+    }
+    return result;
+}
